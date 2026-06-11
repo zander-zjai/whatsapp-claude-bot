@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.production
+*.log
+npm-debug.log*
+.DS_Store
+
+# Runtime data (auto-created; see clients.example.json for the template)
+clients.json
+logs.json
+settings.json
+error-logs/
+backups/
+data/
+
+# Atomic-write temp files
+*.tmp

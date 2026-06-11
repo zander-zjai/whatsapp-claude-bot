@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment files (never commit secrets)
+.env
+.env.production
+.env.*.local
+
+# Backend runtime data (auto-created; see backend/clients.example.json)
+clients.json
+logs.json
+settings.json
+error-logs/
+backups/
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Atomic-write temp files
+*.tmp
+
+# Frontend build output
+dist/
+
+# Deployment tooling caches
+.railway/
+.vercel/
+
+# Editor/OS
+.DS_Store

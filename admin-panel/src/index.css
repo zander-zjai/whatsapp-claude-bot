@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
+
+/* Simple toggle switch */
+.switch {
+  @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors;
+}
+.switch[data-on='true'] {
+  @apply bg-primary;
+}
+.switch[data-on='false'] {
+  @apply bg-gray-300;
+}
+.switch span {
+  @apply inline-block h-4 w-4 transform rounded-full bg-white transition-transform;
+}
+.switch[data-on='true'] span {
+  @apply translate-x-6;
+}
+.switch[data-on='false'] span {
+  @apply translate-x-1;
+}
