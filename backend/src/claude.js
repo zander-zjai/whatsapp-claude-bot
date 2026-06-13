@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { log, logError } = require('./logger');
 const settingsManager = require('./settingsManager');
 
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'claude-sonnet-4-5';
 const MAX_TOKENS = 1024;
 
 // Cache one Anthropic client per API key so we don't rebuild it per message.
