@@ -7,7 +7,6 @@ node_modules/
 .env.*.local
 
 # Backend runtime data (auto-created; see backend/clients.example.json)
-clients.json
 logs.json
 settings.json
 error-logs/
