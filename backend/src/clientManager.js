@@ -22,6 +22,9 @@ const EDITABLE_FIELDS = [
   'bot_name',
   'system_prompt',
   'active',
+  'owner_phone',
+  'business_hours',
+  'quote_requests_enabled',
 ];
 
 const REQUIRED_FIELDS = [
@@ -34,6 +37,16 @@ const REQUIRED_FIELDS = [
   'system_prompt',
 ];
 
+// Fresh-copied per client in addClient/updateClient so clients never share
+// the same nested object reference.
+const DEFAULT_BUSINESS_HOURS = {
+  enabled: false,
+  timezone: 'Africa/Johannesburg',
+  open: '08:00',
+  close: '17:00',
+  days: [1, 2, 3, 4, 5],
+};
+
 const DEFAULTS = {
   business_type: 'Other',
   use_platform_key: false,
@@ -42,6 +55,8 @@ const DEFAULTS = {
   bot_personality: 'Professional',
   bot_name: 'Assistant',
   active: true,
+  owner_phone: '',
+  quote_requests_enabled: false,
 };
 
 // In-memory cache of clients, keyed for fast lookup by phone_number_id.
@@ -172,6 +187,8 @@ function addClient(data) {
     ),
     use_platform_key: Boolean(picked.use_platform_key),
     active: picked.active !== undefined ? Boolean(picked.active) : DEFAULTS.active,
+    quote_requests_enabled: Boolean(picked.quote_requests_enabled),
+    business_hours: { ...DEFAULT_BUSINESS_HOURS, ...(picked.business_hours || {}) },
     created_at: now,
     updated_at: now,
   };
@@ -204,6 +221,16 @@ function updateClient(id, data) {
   }
   if (picked.active !== undefined) {
     picked.active = Boolean(picked.active);
+  }
+  if (picked.quote_requests_enabled !== undefined) {
+    picked.quote_requests_enabled = Boolean(picked.quote_requests_enabled);
+  }
+  if (picked.business_hours !== undefined) {
+    picked.business_hours = {
+      ...DEFAULT_BUSINESS_HOURS,
+      ...client.business_hours,
+      ...picked.business_hours,
+    };
   }
 
   Object.assign(client, picked, { updated_at: new Date().toISOString() });

@@ -11,4 +11,12 @@ function maskPhone(number) {
   return `${cleaned.slice(0, 5)}***${cleaned.slice(-2)}`;
 }
 
-module.exports = { maskPhone };
+/**
+ * Strip everything except digits, so phone numbers can be compared
+ * regardless of "+", spaces, or dashes (e.g. "+27 82-123 4567" -> "27821234567").
+ */
+function normalizeNumber(number) {
+  return String(number || '').replace(/[^\d]/g, '');
+}
+
+module.exports = { maskPhone, normalizeNumber };

@@ -9,6 +9,8 @@ node_modules/
 # Backend runtime data (auto-created; see backend/clients.example.json)
 logs.json
 settings.json
+conversations.json
+quotes.json
 error-logs/
 backups/
 data/

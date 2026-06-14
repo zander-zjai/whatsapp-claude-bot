@@ -39,6 +39,18 @@ admin panel.
 - Multi-client routing by `phone_number_id`, each with its own token, Claude key, and system prompt
 - Claude integration (`claude-sonnet-4-20250514`) with per-client system prompts
 - Conversation memory (configurable length, default 10 messages, auto-reset after 24h)
+- **Human handover**: the owner sends `#takeover`/`#release` from their configured WhatsApp
+  number to silence/reactivate Zara for a specific conversation. Urgent keywords
+  ("speak to a person", "human", "urgent", ...) trigger an automatic "connect you
+  with someone" reply and a WhatsApp notification to the owner
+- **Business hours**: per-client open/close schedule (timezone-aware). Outside
+  hours, customers get a "we're closed" auto-reply — urgent messages still notify
+  the owner regardless of hours
+- **Persistent conversation history per contact** (`conversations.json`) — Zara
+  greets returning customers by name if they previously introduced themselves
+- **Quote request detection**: Zara collects name, contact number, item, size, and
+  quantity through natural conversation, then sends the owner a formatted WhatsApp
+  summary and stores it in `quotes.json`
 - Per-message logging to `logs.json` (timestamp, customer, message, reply, response time, status)
 - Graceful fallback message if Claude fails; non-text messages ignored silently
 - `GET /health` — status, uptime, active/total client counts, active conversations (for uptime monitors)
@@ -50,6 +62,10 @@ admin panel.
 - Clients table: business type, WhatsApp number ID, active toggle, messages today, date added
 - Add/Edit client forms (business info, WhatsApp + Claude config, bot personality, system prompt)
 - Per-client message logs with masked phone numbers, search, and date-range filtering
+- Conversations page: every active conversation, last message, handover status
+  (Active / Awaiting Human / Handover), and a manual take-over/release toggle
+- Quote Requests page: every quote collected by Zara (name, contact, item, size,
+  quantity, customer WhatsApp number)
 - Settings: platform Claude API key, webhook base URL, fallback message, conversation memory length, admin password change
 - Recent server errors viewable via `GET /admin/errors`
 - Error boundary for graceful recovery from unexpected UI errors
@@ -73,6 +89,8 @@ whatsapp-claude-bot/
 │   ├── clients.example.json   # template for clients.json
 │   ├── logs.json             # per-message logs (auto-created, gitignored)
 │   ├── settings.json         # platform settings (auto-created, gitignored)
+│   ├── conversations.json    # per-contact conversation state + handover status (auto-created, gitignored)
+│   ├── quotes.json           # quote requests collected by Zara (auto-created, gitignored)
 │   ├── .env / .env.example / .env.production.example
 │   ├── package.json
 │   └── src/
@@ -87,7 +105,11 @@ whatsapp-claude-bot/
 │       ├── adminRoutes.js    # /admin/* API for the admin panel (incl. /admin/errors)
 │       ├── fileStore.js      # DATA_DIR-aware JSON read/write (atomic writes)
 │       ├── errorLogger.js    # daily-rotated error logs (7-day retention)
-│       ├── phone.js          # phone number masking for logs
+│       ├── phone.js          # phone number masking + normalization
+│       ├── conversationManager.js # persisted per-contact state + handover status
+│       ├── quoteManager.js   # quote request capture + storage
+│       ├── businessHours.js  # business-hours check + closed-hours message
+│       ├── handover.js       # owner-command parsing + urgent-keyword detection
 │       └── logger.js         # tiny timestamped logger
 │
 └── admin-panel/
@@ -97,7 +119,7 @@ whatsapp-claude-bot/
     ├── vercel.json
     ├── .env / .env.example / .env.production.example
     └── src/
-        ├── pages/             # Login, Dashboard, Clients, AddClient, EditClient, ClientLogs, Settings
+        ├── pages/             # Login, Dashboard, Clients, AddClient, EditClient, ClientLogs, Conversations, QuoteRequests, Settings
         ├── components/        # Sidebar, Header, Layout, ClientForm, ClientTable, MessageChart, ErrorBoundary, ...
         ├── api/                # axios client + endpoint helpers
         ├── context/AuthContext.jsx
@@ -197,6 +219,11 @@ Open the printed URL (usually `http://localhost:5173`), log in with the
      describe the business and include something like *"Always reply in the
      same language the customer uses."*
    - **Monthly Message Limit** and **Active** toggle
+   - **Owner WhatsApp Number** — for `#takeover`/`#release` and handover/quote
+     notifications (see [Human handover, business hours & quote
+     requests](#human-handover-business-hours--quote-requests))
+   - **Business Hours** — optional open/close schedule per timezone
+   - **Quote Requests** toggle — let Zara collect and report quote requests
 3. Click **Add Client**. You'll see a success screen with the generated
    **webhook URL** and a setup checklist:
    - ✅ Client added to system
@@ -357,6 +384,9 @@ Railway (static service), or Nginx instead of Vercel if preferred. Same
 | `GET`    | `/admin/settings`          | JWT         | Get platform settings                     |
 | `PUT`    | `/admin/settings`          | JWT         | Update settings / change admin password   |
 | `GET`    | `/admin/errors`            | JWT         | Recent server errors (`?limit=`, last 7 days) |
+| `GET`    | `/admin/conversations`     | JWT         | List conversations + handover status (`?client_id=`) |
+| `POST`   | `/admin/conversations/handover` | JWT    | Set handover state: `{ client_id, customer_number, active }` |
+| `GET`    | `/admin/quotes`            | JWT         | List quote requests (`?client_id=&limit=`) |
 
 JWT auth: send `Authorization: Bearer <token>` (token from `/admin/login`,
 valid 8h). `POST /admin/login` is rate-limited to 5 attempts / 15 min.
@@ -381,6 +411,69 @@ valid 8h). `POST /admin/login` is rate-limited to 5 attempts / 15 min.
 - Capped at the most recent 5,000 entries.
 - The admin panel's **Logs** page (per client) reads from this file via
   `GET /admin/clients/:id/logs`.
+
+---
+
+## Human handover, business hours & quote requests
+
+### Human handover
+
+WhatsApp's Cloud API has no concept of a 3-way conversation, so the owner
+participates by messaging **the bot's own number** from their configured
+**Owner WhatsApp Number**:
+
+- **`#takeover`** — Zara stops replying to the most recently active customer
+  conversation. Add a number to target a specific conversation:
+  `#takeover +27821234567`.
+- **`#release`** — hands the conversation back to Zara.
+- The owner gets a WhatsApp confirmation either way.
+
+While a conversation is in handover, incoming customer messages are recorded
+(for the admin panel and conversation history) but Zara stays silent. The
+admin panel's **Conversations** page shows the same state and lets you
+toggle it manually via `POST /admin/conversations/handover`.
+
+**Urgent keywords** ("speak to a person", "talk to someone", "human",
+"urgent") always trigger an immediate "Let me connect you with someone"
+reply plus a WhatsApp notification to the owner — regardless of business
+hours or existing handover state.
+
+> **Note:** owner notifications are sent as regular WhatsApp messages. Per
+> Meta's messaging rules, business-initiated messages outside the 24-hour
+> customer service window may require an approved message template — if the
+> owner hasn't messaged the bot's number recently, delivery can fail. Send
+> `#release` or any message from the owner's number occasionally to keep the
+> window open, or set up a template for production use.
+
+### Business hours
+
+Set **Business Hours** (timezone, open/close time, open days) per client. If
+enabled and a customer messages outside those hours, Zara replies with:
+
+> "We are closed, our hours are Mon-Fri 08:00-17:00. We will get back to you
+> tomorrow."
+
+Urgent messages bypass this check entirely — the owner is still notified
+after hours.
+
+### Conversation history per contact
+
+`backend/conversations.json` persists each contact's last-seen timestamp,
+last message preview, handover state, and (if they introduced themselves,
+e.g. "Hi, I'm Sarah") their name. If a returning customer messages again
+after their in-memory session has expired, Zara is told their name so it can
+greet them by name.
+
+### Quote requests
+
+When **Quote Requests** is enabled for a client, Zara asks for whatever is
+missing — name, contact number, item/specs, size, and quantity — through
+natural conversation. Once all five are collected, the request is stored in
+`backend/quotes.json` and the owner gets a WhatsApp summary:
+
+> "New Quote Request from Jane Doe: ..."
+
+View all quote requests in the admin panel's **Quote Requests** page.
 
 ---
 
@@ -419,10 +512,11 @@ warm — useful on hosting tiers that spin down idle services.
 
 - **Only text messages** are handled by the webhook. Images, audio, stickers,
   etc. are ignored.
-- `clients.json`, `logs.json`, and `settings.json` hold secrets/PII in
-  plaintext — keep them out of version control (already in `.gitignore`) and
-  lock down access to `DATA_DIR` in production. See [SECURITY.md](SECURITY.md)
-  for the full production security checklist.
+- `clients.json`, `logs.json`, `settings.json`, `conversations.json`, and
+  `quotes.json` hold secrets/PII in plaintext — keep them out of version
+  control (already in `.gitignore`) and lock down access to `DATA_DIR` in
+  production. See [SECURITY.md](SECURITY.md) for the full production security
+  checklist.
 - The `POST /webhook` handler returns `200` to Meta immediately and processes
   the message asynchronously, so Meta won't retry on slow Claude responses.
 - The admin panel stores its JWT in `localStorage` — fine for an internal

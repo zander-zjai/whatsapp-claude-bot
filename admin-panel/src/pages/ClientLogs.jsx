@@ -144,7 +144,9 @@ export default function ClientLogs() {
                       className={`rounded-full px-2 py-1 text-xs font-medium ${
                         logEntry.status === 'success'
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                          : logEntry.status === 'handover'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-red-100 text-red-700'
                       }`}
                     >
                       {logEntry.status}

@@ -9,6 +9,8 @@ const logsManager = require('./logsManager');
 const settingsManager = require('./settingsManager');
 const errorLogger = require('./errorLogger');
 const auth = require('./auth');
+const conversationManager = require('./conversationManager');
+const quoteManager = require('./quoteManager');
 
 const router = express.Router();
 
@@ -111,6 +113,8 @@ router.delete('/clients/:id', (req, res) => {
 
   clientManager.deleteClient(req.params.id);
   memory.clearForClient(req.params.id);
+  conversationManager.clearForClient(req.params.id);
+  quoteManager.clearForClient(req.params.id);
   log(`Admin deleted client "${client.name}" (id=${client.id})`);
   res.json({ success: true });
 });
@@ -218,6 +222,61 @@ router.put('/settings', (req, res) => {
 router.get('/errors', (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 100;
   res.json({ errors: errorLogger.getRecentErrors(Number.isFinite(limit) ? limit : 100) });
+});
+
+// ------------------------------------------------------------------
+// Conversations (active conversations + handover status)
+// ------------------------------------------------------------------
+
+/** GET /admin/conversations — all conversations, optionally filtered by client. */
+router.get('/conversations', (req, res) => {
+  const { client_id: clientId } = req.query;
+
+  const conversations = clientId
+    ? conversationManager.getConversationsForClient(clientId)
+    : conversationManager.getAllConversations();
+
+  res.json({ conversations });
+});
+
+/**
+ * POST /admin/conversations/handover — manually set the handover state of a
+ * conversation (the same toggle the owner controls via #takeover/#release).
+ * Body: { client_id, customer_number, active }
+ */
+router.post('/conversations/handover', (req, res) => {
+  const { client_id: clientId, customer_number: customerNumber, active } = req.body || {};
+
+  if (!clientId || !customerNumber) {
+    return res.status(400).json({ error: 'client_id and customer_number are required' });
+  }
+
+  const client = clientManager.getClientById(clientId);
+  if (!client) {
+    return res.status(404).json({ error: 'Client not found' });
+  }
+
+  const conversation = conversationManager.setHandover(clientId, customerNumber, Boolean(active));
+  log(
+    `Admin ${active ? 'started' : 'ended'} handover for ${client.name} <-> ${customerNumber}`
+  );
+  res.json({ conversation });
+});
+
+// ------------------------------------------------------------------
+// Quote requests
+// ------------------------------------------------------------------
+
+/** GET /admin/quotes — quote requests, optionally filtered by client. */
+router.get('/quotes', (req, res) => {
+  const { client_id: clientId, limit } = req.query;
+  const opts = { limit: limit ? Number(limit) : 100 };
+
+  const quotes = clientId
+    ? quoteManager.getQuotesForClient(clientId, opts)
+    : quoteManager.getAllQuotes(opts);
+
+  res.json({ quotes });
 });
 
 module.exports = router;

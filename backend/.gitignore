@@ -9,6 +9,8 @@ npm-debug.log*
 clients.json
 logs.json
 settings.json
+conversations.json
+quotes.json
 error-logs/
 backups/
 data/

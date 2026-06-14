@@ -9,7 +9,13 @@ const { getClaudeReply } = require('./claude');
 const { sendWhatsAppMessage } = require('./whatsapp');
 const settingsManager = require('./settingsManager');
 const logsManager = require('./logsManager');
-const { maskPhone } = require('./phone');
+const { maskPhone, normalizeNumber } = require('./phone');
+const conversationManager = require('./conversationManager');
+const quoteManager = require('./quoteManager');
+const businessHours = require('./businessHours');
+const handover = require('./handover');
+
+const URGENT_REPLY = 'Let me connect you with someone.';
 
 /**
  * GET /webhook
@@ -132,8 +138,110 @@ function handleWebhook(req, res) {
 }
 
 /**
- * Core pipeline: match client -> append to memory -> call Claude -> reply.
- * On Claude/parse failure, sends the fallback message to the customer.
+ * Send a WhatsApp message to the client's configured owner, if any.
+ * Best-effort: failures are logged but never thrown, so an owner
+ * notification can never break the customer-facing reply.
+ */
+async function notifyOwner(client, text) {
+  if (!client.owner_phone) return;
+
+  try {
+    await sendWhatsAppMessage(client, normalizeNumber(client.owner_phone), text);
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Failed to notify owner:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Failed to notify owner: ${detail}`, err);
+  }
+}
+
+/**
+ * Send a reply to the customer, logging (but not throwing on) failures.
+ * Returns true on success, false on failure.
+ */
+async function sendReply(client, to, text) {
+  try {
+    await sendWhatsAppMessage(client, to, text);
+    return true;
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Failed to send WhatsApp reply:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Failed to send WhatsApp reply: ${detail}`, err);
+    return false;
+  }
+}
+
+/**
+ * Handle a message from the client's configured owner number.
+ *
+ * @returns {Promise<boolean>} true if the message was a recognized
+ *   #takeover/#release command (handled here, stop processing); false if
+ *   it should fall through to normal customer handling.
+ */
+async function handleOwnerCommand(client, from, text) {
+  const command = handover.parseOwnerCommand(text);
+  if (!command) return false;
+
+  const target = command.number
+    ? conversationManager.findConversationByNumber(client.id, command.number)
+    : conversationManager.findMostRecent(client.id);
+
+  if (!target) {
+    await notifyOwner(
+      client,
+      command.number
+        ? `No conversation found for ${command.number}.`
+        : 'No active conversations yet.'
+    );
+    return true;
+  }
+
+  const active = command.command === 'takeover';
+  conversationManager.setHandover(client.id, target.customer_number, active);
+
+  const label = target.customer_name
+    ? `${target.customer_name} (${target.customer_number})`
+    : target.customer_number;
+
+  await notifyOwner(
+    client,
+    active
+      ? `You're now handling the conversation with ${label}. Zara will stay quiet until you send #release.`
+      : `Zara is back in control of the conversation with ${label}.`
+  );
+
+  return true;
+}
+
+/** WhatsApp notification sent to the owner when a customer needs human help. */
+function buildUrgentNotification(client, from, text, conv) {
+  const label = conv && conv.customer_name ? `${conv.customer_name} (${from})` : from;
+  return (
+    `Heads up - ${label} needs human help:\n"${text}"\n\n` +
+    `Reply #takeover ${from} to take over this conversation, or #takeover to grab the most recent one.`
+  );
+}
+
+/** WhatsApp notification sent to the owner when Zara collects a full quote request. */
+function buildQuoteNotification(quote, from) {
+  return (
+    `New Quote Request from ${quote.name}:\n` +
+    `- Contact: ${quote.contact_number}\n` +
+    `- Item: ${quote.item_description}\n` +
+    `- Size: ${quote.size}\n` +
+    `- Quantity: ${quote.quantity}\n` +
+    `(WhatsApp: ${from})`
+  );
+}
+
+/**
+ * Core pipeline. Order of operations:
+ *  1. Owner commands (#takeover / #release) - handled and stopped here.
+ *  2. Record the message + learn the customer's name if introduced.
+ *  3. Active handover - Zara stays silent, message just logged.
+ *  4. Urgent keywords - canned "connect you with someone" reply + owner ping.
+ *  5. Outside business hours - closed-hours auto-reply.
+ *  6. Normal flow - Claude reply, returning-customer greeting, quote capture.
+ *
  * Every processed message is recorded to logs.json for the admin panel.
  */
 async function processMessage({ from, phoneNumberId, text }) {
@@ -148,18 +256,107 @@ async function processMessage({ from, phoneNumberId, text }) {
 
   log(`[${client.name}] Incoming message <- ${maskPhone(from)}: "${text}"`);
 
+  // The owner messaging the bot's own number is a control command, not a
+  // customer conversation - handle it separately and stop.
+  if (handover.isFromOwner(client, from)) {
+    const handled = await handleOwnerCommand(client, from, text);
+    if (handled) return;
+  }
+
   const startedAt = Date.now();
 
-  // Record the user's message in conversation memory.
+  conversationManager.recordCustomerMessage(client.id, from, text);
+  const conv = conversationManager.getConversation(client.id, from);
+
+  // Capture the name we already knew about *before* this message, so a
+  // first-time introduction doesn't get treated as a "returning customer".
+  const priorCustomerName = conv.customer_name;
+
+  const introducedName = conversationManager.extractIntroducedName(text);
+  if (introducedName) {
+    conversationManager.setCustomerName(client.id, from, introducedName);
+  }
+
+  // The owner has taken this conversation over: Zara stays silent.
+  if (conv.handover_active) {
+    logsManager.addLog({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      customer_message: text,
+      bot_reply: '(handover active - no reply sent)',
+      response_time_ms: Date.now() - startedAt,
+      status: 'handover',
+    });
+    return;
+  }
+
+  // Urgent keyword - hand off to a human regardless of business hours.
+  if (handover.isUrgentMessage(text)) {
+    conversationManager.setAwaitingHuman(client.id, from, true);
+
+    memory.addMessage(client.id, from, 'user', text);
+    memory.addMessage(client.id, from, 'assistant', URGENT_REPLY);
+
+    await sendReply(client, from, URGENT_REPLY);
+    await notifyOwner(client, buildUrgentNotification(client, from, text, conv));
+
+    logsManager.addLog({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      customer_message: text,
+      bot_reply: URGENT_REPLY,
+      response_time_ms: Date.now() - startedAt,
+      status: 'handover',
+    });
+    return;
+  }
+
+  // Outside business hours - send the closed-hours auto-reply.
+  if (!businessHours.isWithinBusinessHours(client)) {
+    const reply = businessHours.getClosedMessage(client);
+
+    memory.addMessage(client.id, from, 'user', text);
+    memory.addMessage(client.id, from, 'assistant', reply);
+
+    const sent = await sendReply(client, from, reply);
+
+    logsManager.addLog({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      customer_message: text,
+      bot_reply: reply,
+      response_time_ms: Date.now() - startedAt,
+      status: sent ? 'success' : 'failed',
+    });
+    return;
+  }
+
+  // Normal flow: ask Claude for a reply.
+  const isNewSession = memory.getHistory(client.id, from).length === 0;
+  const returningCustomerName = isNewSession ? priorCustomerName : null;
+
   memory.addMessage(client.id, from, 'user', text);
   const history = memory.getHistory(client.id, from);
 
   let reply;
   let status = 'success';
+  let quote = null;
 
   try {
-    reply = await getClaudeReply(client, history);
-    // Persist the assistant reply so it's part of the next turn's context.
+    const rawReply = await getClaudeReply(client, history, {
+      returningCustomerName,
+      quoteRequestsEnabled: !!client.quote_requests_enabled,
+    });
+
+    const extracted = quoteManager.extractQuoteRequest(rawReply);
+    reply = extracted.text;
+    quote = extracted.quote;
+
+    // Persist the cleaned reply (marker stripped) so it's part of the
+    // next turn's context.
     memory.addMessage(client.id, from, 'assistant', reply);
   } catch (err) {
     logError(`[${client.name}] Claude API error:`, err.message);
@@ -168,13 +365,17 @@ async function processMessage({ from, phoneNumberId, text }) {
     status = 'failed';
   }
 
-  try {
-    await sendWhatsAppMessage(client, from, reply);
-  } catch (err) {
-    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-    logError(`[${client.name}] Failed to send WhatsApp reply:`, detail);
-    errorLogger.logErrorToFile(`[${client.name}] Failed to send WhatsApp reply: ${detail}`, err);
-    status = 'failed';
+  const sent = await sendReply(client, from, reply);
+  if (!sent) status = 'failed';
+
+  if (quote) {
+    quoteManager.addQuote({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      ...quote,
+    });
+    await notifyOwner(client, buildQuoteNotification(quote, from));
   }
 
   logsManager.addLog({

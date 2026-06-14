@@ -6,6 +6,8 @@ import Clients from './pages/Clients';
 import AddClient from './pages/AddClient';
 import EditClient from './pages/EditClient';
 import ClientLogs from './pages/ClientLogs';
+import Conversations from './pages/Conversations';
+import QuoteRequests from './pages/QuoteRequests';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/clients/new" element={<AddClient />} />
         <Route path="/clients/edit/:id" element={<EditClient />} />
         <Route path="/clients/:id/logs" element={<ClientLogs />} />
+        <Route path="/conversations" element={<Conversations />} />
+        <Route path="/quotes" element={<QuoteRequests />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 

@@ -31,3 +31,16 @@ export const getSettings = () => apiClient.get('/admin/settings').then((r) => r.
 
 export const updateSettings = (data) =>
   apiClient.put('/admin/settings', data).then((r) => r.data.settings);
+
+// --- Conversations ---
+export const getConversations = (params = {}) =>
+  apiClient.get('/admin/conversations', { params }).then((r) => r.data.conversations);
+
+export const setConversationHandover = (clientId, customerNumber, active) =>
+  apiClient
+    .post('/admin/conversations/handover', { client_id: clientId, customer_number: customerNumber, active })
+    .then((r) => r.data.conversation);
+
+// --- Quote requests ---
+export const getQuotes = (params = {}) =>
+  apiClient.get('/admin/quotes', { params }).then((r) => r.data.quotes);

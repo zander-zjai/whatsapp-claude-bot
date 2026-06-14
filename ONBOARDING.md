@@ -23,6 +23,13 @@ create one, or have them send you:
 4. Basic business info: name, type, contact person/email/phone.
 5. A short description of how the bot should behave (tone, what it should
    help with, anything it should never say).
+6. (Optional) The **owner's WhatsApp number** — lets them send
+   `#takeover`/`#release` and receive handover/quote notifications. This
+   should be a different number from the bot's own WhatsApp Business number.
+7. (Optional) **Business hours** — timezone, open/close time, and open days,
+   if they want an automatic "we're closed" reply outside those hours.
+8. Whether they want Zara to **collect quote requests** (name, contact,
+   item, size, quantity) and notify them by WhatsApp.
 
 ---
 
@@ -53,6 +60,20 @@ create one, or have them send you:
    - **Custom System Prompt** — describe the business and what the bot
      should do. Always include something like:
      > "Always reply in the same language the customer uses."
+
+   **Owner & Handover**
+   - **Owner WhatsApp Number** — if provided, this number can send
+     `#takeover` / `#release` to silence/reactivate Zara for a conversation,
+     and receives WhatsApp notifications for urgent messages and quote
+     requests.
+
+   **Business Hours**
+   - Toggle on and set timezone, open/close time, and open days if the bot
+     should send a "we're closed" auto-reply outside those hours. Leave off
+     for 24/7 bots.
+
+   **Quote Requests**
+   - Toggle on if Zara should collect quote details and notify the owner.
 
    **Status**
    - Leave **Active** on so the bot responds immediately.
@@ -101,6 +122,18 @@ pointed at your shared backend:
    message appears with `status: success`.
 4. Check the **Dashboard** — "Messages Today" should increment and the
    7-day chart should show this client.
+5. If an **Owner WhatsApp Number** is set:
+   - Send a message containing "urgent" or "human" from a test number —
+     you should get the "Let me connect you with someone" reply, and the
+     owner number should receive a notification.
+   - From the owner's number, send `#takeover` — further messages from that
+     test number should get no reply (check **Conversations** in the admin
+     panel shows "Handover"). Send `#release` to hand it back to Zara.
+6. If **Business Hours** are enabled, message outside those hours and
+   confirm the "We are closed..." reply.
+7. If **Quote Requests** are enabled, ask for a quote and provide all the
+   details Zara asks for — confirm it appears on the **Quote Requests** page
+   and the owner gets a WhatsApp summary.
 
 If something doesn't work, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 

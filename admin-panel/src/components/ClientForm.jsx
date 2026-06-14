@@ -18,11 +18,22 @@ export const DEFAULT_CLIENT_VALUES = {
   bot_name: '',
   system_prompt: '',
   active: true,
+  owner_phone: '',
+  business_hours: {
+    enabled: false,
+    timezone: 'Africa/Johannesburg',
+    open: '08:00',
+    close: '17:00',
+    days: [1, 2, 3, 4, 5],
+  },
+  quote_requests_enabled: false,
 };
 
 const inputClass =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
 const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function ClientForm({ initialValues, onSubmit, submitLabel, loading, error, updatedAt }) {
   const [values, setValues] = useState({ ...DEFAULT_CLIENT_VALUES, ...initialValues });
@@ -34,6 +45,23 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
   function handleChange(e) {
     const { name, type, value, checked } = e.target;
     set(name, type === 'checkbox' ? checked : value);
+  }
+
+  function setBusinessHours(field, value) {
+    setValues((prev) => ({
+      ...prev,
+      business_hours: { ...prev.business_hours, [field]: value },
+    }));
+  }
+
+  function toggleBusinessDay(day) {
+    setValues((prev) => {
+      const days = prev.business_hours.days || [];
+      const newDays = days.includes(day)
+        ? days.filter((d) => d !== day)
+        : [...days, day].sort((a, b) => a - b);
+      return { ...prev, business_hours: { ...prev.business_hours, days: newDays } };
+    });
   }
 
   function handleSubmit(e) {
@@ -235,6 +263,120 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             Tip: include an instruction like "Always reply in the same language the customer uses."
           </p>
         </div>
+      </section>
+
+      {/* Owner & handover */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-gray-900">Owner & Handover</h2>
+        <div>
+          <label className={labelClass}>Owner WhatsApp Number</label>
+          <input
+            type="tel"
+            name="owner_phone"
+            value={values.owner_phone}
+            onChange={handleChange}
+            placeholder="+27821234567"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            From this number, send <code>#takeover</code> to silence Zara for a conversation and{' '}
+            <code>#release</code> to hand it back. Zara also notifies this number when a customer
+            asks for a human or after-hours urgent help.
+          </p>
+        </div>
+      </section>
+
+      {/* Business hours */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-gray-900">Business Hours</h2>
+
+        <label className="mb-3 flex items-center gap-3">
+          <button
+            type="button"
+            className="switch"
+            data-on={values.business_hours.enabled}
+            onClick={() => setBusinessHours('enabled', !values.business_hours.enabled)}
+          >
+            <span />
+          </button>
+          <span className="text-sm text-gray-700">
+            Restrict Zara's replies to business hours (outside these hours, customers get a
+            "we're closed" auto-reply)
+          </span>
+        </label>
+
+        {values.business_hours.enabled && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className={labelClass}>Timezone</label>
+                <input
+                  type="text"
+                  value={values.business_hours.timezone}
+                  onChange={(e) => setBusinessHours('timezone', e.target.value)}
+                  placeholder="Africa/Johannesburg"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Opens</label>
+                <input
+                  type="time"
+                  value={values.business_hours.open}
+                  onChange={(e) => setBusinessHours('open', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Closes</label>
+                <input
+                  type="time"
+                  value={values.business_hours.close}
+                  onChange={(e) => setBusinessHours('close', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Open Days</label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_LABELS.map((label, day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleBusinessDay(day)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                      values.business_hours.days.includes(day)
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-gray-300 bg-white text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Quote requests */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-gray-900">Quote Requests</h2>
+        <label className="flex items-center gap-3">
+          <button
+            type="button"
+            className="switch"
+            data-on={values.quote_requests_enabled}
+            onClick={() => set('quote_requests_enabled', !values.quote_requests_enabled)}
+          >
+            <span />
+          </button>
+          <span className="text-sm text-gray-700">
+            When customers ask for a quote, Zara collects their name, contact number, item,
+            size, and quantity, then sends the owner a summary via WhatsApp.
+          </span>
+        </label>
       </section>
 
       {/* Status */}

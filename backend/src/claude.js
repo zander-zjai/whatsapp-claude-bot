@@ -3,6 +3,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { log, logError } = require('./logger');
 const settingsManager = require('./settingsManager');
+const quoteManager = require('./quoteManager');
 
 const MODEL = 'claude-sonnet-4-5';
 const MAX_TOKENS = 1024;
@@ -37,19 +38,47 @@ function resolveApiKey(client) {
 }
 
 /**
+ * Build the system prompt sent to Claude, layering returning-customer and
+ * quote-request instructions on top of the client's base system_prompt.
+ *
+ * @param {object} client
+ * @param {object} [options]
+ * @param {string|null} [options.returningCustomerName] - Set if this customer
+ *   has messaged before and previously gave their name.
+ * @param {boolean} [options.quoteRequestsEnabled] - Append quote-collection
+ *   instructions for this client.
+ */
+function buildSystemPrompt(client, options = {}) {
+  const parts = [client.system_prompt];
+
+  if (options.returningCustomerName) {
+    parts.push(
+      `This is a returning customer who previously introduced themselves as ${options.returningCustomerName}. Greet them by name.`
+    );
+  }
+
+  if (options.quoteRequestsEnabled) {
+    parts.push(quoteManager.QUOTE_REQUEST_INSTRUCTIONS);
+  }
+
+  return parts.join('\n\n');
+}
+
+/**
  * Send the conversation to Claude and return the assistant's text reply.
  *
  * @param {object}  client   - The matched client config (system_prompt, claude_api_key, name).
  * @param {Array}   history  - Prior messages [{ role, content }, ...] (already includes the new user msg).
+ * @param {object}  [options] - See buildSystemPrompt.
  * @returns {Promise<string>} Claude's text response.
  */
-async function getClaudeReply(client, history) {
+async function getClaudeReply(client, history, options = {}) {
   const anthropic = getAnthropicClient(resolveApiKey(client));
 
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: client.system_prompt,
+    system: buildSystemPrompt(client, options),
     messages: history,
   });
 

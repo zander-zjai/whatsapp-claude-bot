@@ -20,6 +20,8 @@ const clientManager = require('./src/clientManager');
 const memory = require('./src/memory');
 const settingsManager = require('./src/settingsManager');
 const logsManager = require('./src/logsManager');
+const conversationManager = require('./src/conversationManager');
+const quoteManager = require('./src/quoteManager');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
 const { version: APP_VERSION } = require('./package.json');
@@ -39,6 +41,8 @@ try {
 
 settingsManager.loadSettings();
 logsManager.loadLogs();
+conversationManager.load();
+quoteManager.load();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
 errorLogger.cleanupOldLogs();
