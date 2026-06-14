@@ -6,12 +6,13 @@ const errorLogger = require('./errorLogger');
 const clientManager = require('./clientManager');
 const memory = require('./memory');
 const { getClaudeReply } = require('./claude');
-const { sendWhatsAppMessage, sendWhatsAppDocument } = require('./whatsapp');
+const { sendWhatsAppMessage } = require('./whatsapp');
 const settingsManager = require('./settingsManager');
 const logsManager = require('./logsManager');
 const { maskPhone, normalizeNumber } = require('./phone');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
+const quoteActions = require('./quoteActions');
 const pdfGenerator = require('./pdfGenerator');
 const businessHours = require('./businessHours');
 const handover = require('./handover');
@@ -279,21 +280,6 @@ async function handleTier2Quote(client, from, quote) {
   await notifyOwner(client, buildPdfQuoteNotification(record));
 }
 
-/** Send a generated PDF quote to the customer. Returns true on success. */
-async function sendQuotePdf(client, quote, pdfBuffer) {
-  try {
-    const filename = `Quote-${quote.id.slice(0, 8)}.pdf`;
-    const caption = `Here's your quote, valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')}.`;
-    await sendWhatsAppDocument(client, quote.customer_number, pdfBuffer, filename, caption);
-    return true;
-  } catch (err) {
-    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-    logError(`[${client.name}] Failed to send quote PDF:`, detail);
-    errorLogger.logErrorToFile(`[${client.name}] Failed to send quote PDF`, err);
-    return false;
-  }
-}
-
 /**
  * Handle an owner's #approve/#reject reply for the most recent pending
  * Tier 2 quote. #approve sends the PDF to the customer; #reject leaves it
@@ -307,21 +293,14 @@ async function handleQuoteDecision(client, decision) {
   }
 
   if (decision === 'approve') {
-    quoteManager.setQuoteStatus(pending.id, 'approved');
-
-    const pdfBuffer = quoteManager.readPdfFile(pending.id);
-    if (!pdfBuffer) {
+    const result = await quoteActions.approveQuote(client, pending);
+    if (result.ok) {
+      await notifyOwner(client, `Quote sent to ${pending.name}.`);
+    } else if (result.reason === 'pdf_missing') {
       await notifyOwner(
         client,
         `Could not find the PDF for ${pending.name}'s quote. Please follow up manually.`
       );
-      return;
-    }
-
-    const sent = await sendQuotePdf(client, pending, pdfBuffer);
-    if (sent) {
-      quoteManager.setQuoteStatus(pending.id, 'sent');
-      await notifyOwner(client, `Quote sent to ${pending.name}.`);
     } else {
       await notifyOwner(
         client,
@@ -329,7 +308,7 @@ async function handleQuoteDecision(client, decision) {
       );
     }
   } else {
-    quoteManager.setQuoteStatus(pending.id, 'rejected');
+    quoteActions.rejectQuote(pending);
     await notifyOwner(
       client,
       `Quote for ${pending.name} marked as rejected. Please follow up with them manually.`

@@ -17,7 +17,10 @@ admin panel.
 - **`/admin-panel`** — React (Vite) + Tailwind dashboard for ZJAI Technologies
   staff to add/edit/activate/deactivate clients, view message logs, monitor
   usage, and configure platform-wide settings — **no code or config file
-  editing required**.
+  editing required**. Also hosts a separate **Client Portal** (`/client/*`)
+  where each client logs in with their own credentials to view conversations,
+  manage quote requests, and edit their bot's settings — see [Client
+  Portal](#client-portal).
 
 ### Documentation
 
@@ -74,6 +77,25 @@ admin panel.
 - Recent server errors viewable via `GET /admin/errors`
 - Error boundary for graceful recovery from unexpected UI errors
 
+**Client Portal** (`/client/*`)
+- Separate self-service login at `/client/login` (contact email + portal
+  password set by ZJAI staff), issuing a 30-day client-role JWT distinct from
+  the admin JWT
+- Dashboard: messages today/this month vs. monthly limit, active
+  conversations, pending quote requests
+- Conversations: every conversation, last message, handover status, and a
+  manual take-over/release toggle (the portal equivalent of
+  `#takeover`/`#release`)
+- Quote Requests: view all quotes; Tier 2 clients can approve/reject pending
+  PDF quotes and download them; any quote can be marked
+  `pending`/`quoted`/`won`/`lost`
+- Price List (Tier 2 only): edit the item/unit/price list used to calculate
+  quote totals
+- Settings: contact info, bot personality/name/system prompt, business hours,
+  and their own portal password
+- Strictly scoped to the logged-in client's own data — never exposes
+  `whatsapp_token`, `claude_api_key`, or password hashes
+
 ---
 
 ## File structure
@@ -113,9 +135,12 @@ whatsapp-claude-bot/
 │       ├── phone.js          # phone number masking + normalization
 │       ├── conversationManager.js # persisted per-contact state + handover status
 │       ├── quoteManager.js   # quote request capture + storage + Tier 2 totals
+│       ├── quoteActions.js   # shared approve/reject logic (WhatsApp #approve/#reject + client portal)
 │       ├── pdfGenerator.js   # branded PDF quote generation (Tier 2, pdfkit)
 │       ├── businessHours.js  # business-hours check + closed-hours message
 │       ├── handover.js       # owner-command parsing + urgent-keyword detection (incl. #approve/#reject)
+│       ├── clientAuth.js     # client portal login + client-role JWT (separate from admin auth.js)
+│       ├── clientPortalRoutes.js # /client/* API for the Client Portal (scoped to one client)
 │       └── logger.js         # tiny timestamped logger
 │
 └── admin-panel/
@@ -125,10 +150,14 @@ whatsapp-claude-bot/
     ├── vercel.json
     ├── .env / .env.example / .env.production.example
     └── src/
-        ├── pages/             # Login, Dashboard, Clients, AddClient, EditClient, ClientLogs, Conversations, QuoteRequests, Settings
-        ├── components/        # Sidebar, Header, Layout, ClientForm, ClientTable, MessageChart, ErrorBoundary, ...
-        ├── api/                # axios client + endpoint helpers
-        ├── context/AuthContext.jsx
+        ├── pages/             # Login, Dashboard, Clients, AddClient, EditClient, ClientLogs,
+        │                      # Conversations, QuoteRequests, Settings, and client/ (ClientLogin,
+        │                      # ClientDashboard, ClientConversations, ClientConversationDetail,
+        │                      # ClientQuotes, ClientPriceList, ClientSettings)
+        ├── components/        # Sidebar, Header, Layout, ClientForm, ClientTable, MessageChart,
+        │                      # ErrorBoundary, ClientSidebar, ClientLayout, ClientProtectedRoute, ...
+        ├── api/                # axios clients + endpoint helpers (admin + client portal)
+        ├── context/           # AuthContext, ClientAuthContext
         ├── App.jsx
         └── main.jsx
 ```
@@ -384,6 +413,7 @@ Railway (static service), or Nginx instead of Vercel if preferred. Same
 | `GET`    | `/admin/clients/:id`       | JWT         | Get one client (for Edit form)            |
 | `POST`   | `/admin/clients`           | JWT         | Add a new client                          |
 | `PUT`    | `/admin/clients/:id`       | JWT         | Update a client                           |
+| `PUT`    | `/admin/clients/:id/portal-password` | JWT | Set/reset a client's Client Portal login password |
 | `DELETE` | `/admin/clients/:id`       | JWT         | Delete a client                           |
 | `GET`    | `/admin/clients/:id/logs`  | JWT         | Message logs (`?search=&date_from=&date_to=&limit=`) |
 | `GET`    | `/admin/stats`             | JWT         | Dashboard stats + 7-day chart data        |
@@ -397,6 +427,28 @@ Railway (static service), or Nginx instead of Vercel if preferred. Same
 
 JWT auth: send `Authorization: Bearer <token>` (token from `/admin/login`,
 valid 8h). `POST /admin/login` is rate-limited to 5 attempts / 15 min.
+
+### Client Portal API (`/client/*`)
+
+| Method  | Path                                     | Auth       | Purpose                                  |
+| ------- | ---------------------------------------- | ---------- | ----------------------------------------- |
+| `POST`  | `/client/login`                          | —          | `{ email, password }` → `{ token, client }` |
+| `GET`   | `/client/me`                             | Client JWT | Own client info + dashboard summary       |
+| `GET`   | `/client/conversations`                  | Client JWT | This client's conversations               |
+| `GET`   | `/client/conversations/:customerNumber`  | Client JWT | Conversation + full message history      |
+| `POST`  | `/client/conversations/handover`         | Client JWT | Toggle handover: `{ customer_number, active }` |
+| `GET`   | `/client/quotes`                         | Client JWT | This client's quote requests (`?limit=`)  |
+| `PATCH` | `/client/quotes/:id`                     | Client JWT | `{ action: "approve"\|"reject" }` (Tier 2, pending only) or `{ status: "pending"\|"quoted"\|"won"\|"lost" }` |
+| `GET`   | `/client/quotes/:id/pdf`                 | Client JWT | Download the PDF for a Tier 2 quote       |
+| `GET`   | `/client/pricelist`                      | Client JWT | `{ price_list, quote_tier }`              |
+| `PUT`   | `/client/pricelist`                      | Client JWT | Replace price list (Tier 2 only)          |
+| `GET`   | `/client/settings`                       | Client JWT | Editable business settings                |
+| `PUT`   | `/client/settings`                       | Client JWT | Update settings; include `current_password`/`new_password` to change the portal password |
+
+Client JWT auth: send `Authorization: Bearer <token>` (token from
+`/client/login`, valid 30 days, stored as `zjai_client_token`). A client JWT
+cannot access any `/admin/*` endpoint and vice versa. `POST /client/login` is
+rate-limited to 5 attempts / 15 min.
 
 ---
 
@@ -520,6 +572,66 @@ for Tier 2 quotes — in the admin panel's **Quote Requests** page.
 
 ---
 
+## Client Portal
+
+Each client can log in to their own **self-service portal** at `/client/login`
+(separate from the staff admin login at `/login`) to check on their bot,
+manage quote requests, and tweak settings — without needing access to the
+admin panel.
+
+### Granting portal access
+
+The portal uses the client's **Contact Email** + a separate **portal
+password**. There's no portal account until ZJAI staff set one — there's no
+admin panel UI for this yet, so set/reset it directly via the API:
+
+```bash
+curl -X PUT https://<your-backend>/admin/clients/<client-id>/portal-password \
+  -H "Authorization: Bearer <admin-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"password": "a-strong-password-at-least-8-chars"}'
+```
+
+Then share with the client:
+- Portal URL: `https://<your-admin-panel>/client/login`
+- Login: their **Contact Email** (as set on their client record)
+- The password you just set — they can change it themselves afterwards from
+  **Settings**.
+
+### What clients can do
+
+- **Dashboard** — messages today/this month vs. their monthly limit, active
+  conversations, and pending quote requests.
+- **Conversations** — every conversation with their customers, last message,
+  handover status, and a manual take-over/release toggle (same as
+  `#takeover`/`#release`).
+- **Quote Requests** — every quote Zara has collected. Tier 2 clients can
+  approve/reject pending PDF quotes (same as `#approve`/`#reject`) and
+  download the generated PDF. Any quote's outcome can be marked
+  `pending` / `quoted` / `won` / `lost` for their own tracking.
+- **Price List** (Tier 2 only) — edit the item/unit/price list Zara uses to
+  calculate quote totals and generate PDFs. Tier 1 clients see an
+  informational message instead.
+- **Settings** — contact person/email/phone, bot personality/name, custom
+  system prompt, business hours, and their own portal password.
+
+### Security
+
+- Portal sessions use a separate **client-role JWT** (30-day expiry, stored
+  in the browser as `zjai_client_token`), distinct from the admin JWT — a
+  portal token cannot access any `/admin/*` endpoint, and an admin token
+  cannot access `/client/*`.
+- Every `/client/*` endpoint is scoped to the logged-in client's own
+  `client_id` — clients can only ever read or modify their own data.
+- `client_password` is stored as a bcrypt hash in `clients.json`. The portal
+  API never returns `client_password`, `whatsapp_token`, or `claude_api_key`.
+- `POST /client/login` is rate-limited the same as `/admin/login` (5
+  attempts / 15 min).
+
+See [Client Portal API](#client-portal-api-client) for the full endpoint list.
+
+---
+
 ## Monitoring & alerts
 
 [UptimeRobot](https://uptimerobot.com) (free) can watch `GET /health` and
@@ -566,6 +678,9 @@ warm — useful on hosting tiers that spin down idle services.
 - The admin panel stores its JWT in `localStorage` — fine for an internal
   single-admin tool, but if you add multiple admin accounts later, consider
   shorter token expiry and refresh tokens.
+- The Client Portal stores its JWT in `localStorage` separately
+  (`zjai_client_token`, 30-day expiry) — admin and client sessions don't
+  interfere with each other, even in the same browser.
 
 ---
 

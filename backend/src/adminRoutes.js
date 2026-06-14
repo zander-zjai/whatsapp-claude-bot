@@ -10,6 +10,7 @@ const logsManager = require('./logsManager');
 const settingsManager = require('./settingsManager');
 const errorLogger = require('./errorLogger');
 const auth = require('./auth');
+const clientAuth = require('./clientAuth');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
 
@@ -103,6 +104,27 @@ router.put('/clients/:id', (req, res) => {
     logError('Admin: failed to update client:', err.message);
     res.status(err.statusCode || 500).json({ error: err.message });
   }
+});
+
+/**
+ * PUT /admin/clients/:id/portal-password — set or reset a client's Client
+ * Portal login password (their portal account uses contact_email + this
+ * password, separate from the admin login).
+ */
+router.put('/clients/:id/portal-password', (req, res) => {
+  const client = clientManager.getClientById(req.params.id);
+  if (!client) {
+    return res.status(404).json({ error: 'Client not found' });
+  }
+
+  const { password } = req.body || {};
+  if (!password || String(password).length < 8) {
+    return res.status(400).json({ error: 'password must be at least 8 characters' });
+  }
+
+  clientAuth.setClientPassword(client.id, password);
+  log(`Admin set portal password for client "${client.name}" (id=${client.id})`);
+  res.json({ success: true });
 });
 
 /** DELETE /admin/clients/:id — remove a client and its conversation memory. */

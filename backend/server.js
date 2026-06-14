@@ -24,6 +24,7 @@ const conversationManager = require('./src/conversationManager');
 const quoteManager = require('./src/quoteManager');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
+const clientPortalRoutes = require('./src/clientPortalRoutes');
 const { version: APP_VERSION } = require('./package.json');
 
 const PORT = process.env.PORT || 3000;
@@ -134,6 +135,11 @@ app.get('/health', (req, res) => {
 // Admin panel API (rate-limited + JWT-protected, except /admin/login)
 // ------------------------------------------------------------------
 app.use('/admin', apiLimiter, adminRoutes);
+
+// ------------------------------------------------------------------
+// Client Portal API (rate-limited + client-JWT-protected, except /client/login)
+// ------------------------------------------------------------------
+app.use('/client', apiLimiter, clientPortalRoutes);
 
 // ------------------------------------------------------------------
 // Fallback 404 + error handler

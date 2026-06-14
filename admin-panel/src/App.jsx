@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import ClientProtectedRoute from './components/ClientProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
@@ -9,6 +10,13 @@ import ClientLogs from './pages/ClientLogs';
 import Conversations from './pages/Conversations';
 import QuoteRequests from './pages/QuoteRequests';
 import Settings from './pages/Settings';
+import ClientLogin from './pages/client/ClientLogin';
+import ClientDashboard from './pages/client/ClientDashboard';
+import ClientConversations from './pages/client/ClientConversations';
+import ClientConversationDetail from './pages/client/ClientConversationDetail';
+import ClientQuotes from './pages/client/ClientQuotes';
+import ClientPriceList from './pages/client/ClientPriceList';
+import ClientSettings from './pages/client/ClientSettings';
 
 export default function App() {
   return (
@@ -26,6 +34,18 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
       </Route>
 
+      <Route path="/client/login" element={<ClientLogin />} />
+
+      <Route element={<ClientProtectedRoute />}>
+        <Route path="/client/dashboard" element={<ClientDashboard />} />
+        <Route path="/client/conversations" element={<ClientConversations />} />
+        <Route path="/client/conversations/:customerNumber" element={<ClientConversationDetail />} />
+        <Route path="/client/quotes" element={<ClientQuotes />} />
+        <Route path="/client/pricelist" element={<ClientPriceList />} />
+        <Route path="/client/settings" element={<ClientSettings />} />
+      </Route>
+
+      <Route path="/client" element={<Navigate to="/client/dashboard" replace />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

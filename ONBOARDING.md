@@ -159,6 +159,32 @@ If something doesn't work, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ---
 
+## 4. (Optional) Give the client access to their Client Portal
+
+Each client can log in at `/client/login` to view their own conversations,
+manage quote requests, edit their price list (Tier 2), and tweak their bot's
+settings — see [Client Portal](README.md#client-portal) in the README for
+full details.
+
+To set it up:
+
+1. Set a portal password for the client (there's no admin panel UI for this
+   yet, so use the API directly):
+   ```bash
+   curl -X PUT https://<your-backend>/admin/clients/<client-id>/portal-password \
+     -H "Authorization: Bearer <admin-jwt>" \
+     -H "Content-Type: application/json" \
+     -d '{"password": "a-strong-password-at-least-8-chars"}'
+   ```
+2. Send the client:
+   - Portal URL: `https://<your-admin-panel>/client/login`
+   - Login: their **Contact Email** (as entered on their client record)
+   - The password you just set
+3. They can change their password themselves from the portal's **Settings**
+   page afterwards.
+
+---
+
 ## Editing or pausing a client later
 
 - **Clients** page → toggle the **Active** switch to instantly pause/resume

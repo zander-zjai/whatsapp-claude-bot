@@ -84,6 +84,14 @@ function getLogsForClient(clientId, { search, dateFrom, dateTo, limit = 100 } = 
     .slice(0, limit);
 }
 
+/**
+ * Full message history for one customer conversation, oldest-first (for the
+ * client portal's conversation detail view).
+ */
+function getLogsForConversation(clientId, customerNumber, { limit = 200 } = {}) {
+  return logs.filter((l) => l.client_id === clientId && l.customer_number === customerNumber).slice(-limit);
+}
+
 function isToday(isoTimestamp) {
   const today = new Date().toISOString().slice(0, 10);
   return isoTimestamp.slice(0, 10) === today;
@@ -92,6 +100,16 @@ function isToday(isoTimestamp) {
 function isThisMonth(isoTimestamp) {
   const nowMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   return isoTimestamp.slice(0, 7) === nowMonth;
+}
+
+/** Count of one client's messages so far today (client portal dashboard). */
+function getTodayMessageCountForClient(clientId) {
+  return logs.filter((l) => l.client_id === clientId && isToday(l.timestamp)).length;
+}
+
+/** Count of one client's messages so far this calendar month (usage vs limit). */
+function getMonthlyMessageCountForClient(clientId) {
+  return logs.filter((l) => l.client_id === clientId && isThisMonth(l.timestamp)).length;
 }
 
 /**
@@ -141,5 +159,8 @@ module.exports = {
   loadLogs,
   addLog,
   getLogsForClient,
+  getLogsForConversation,
+  getTodayMessageCountForClient,
+  getMonthlyMessageCountForClient,
   getStats,
 };

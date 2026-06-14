@@ -67,7 +67,21 @@ const DEFAULTS = {
   logo_url: '',
   brand_color: '#1E3A8A',
   quote_terms: '',
+  client_password: null,
 };
+
+// Fields a client can change themselves via PUT /client/settings. Notably
+// excludes phone_number_id, whatsapp_token, claude_api_key, quote_tier, etc.
+// — those remain owner (admin)-only.
+const CLIENT_PORTAL_SETTINGS_FIELDS = [
+  'business_hours',
+  'system_prompt',
+  'bot_personality',
+  'bot_name',
+  'contact_person',
+  'contact_email',
+  'contact_phone',
+];
 
 /**
  * Coerce arbitrary input into a clean price list: an array of
@@ -128,6 +142,13 @@ function getClientByPhoneNumberId(phoneNumberId) {
   return clients.find(
     (c) => c.active === true && String(c.phone_number_id) === String(phoneNumberId)
   );
+}
+
+/** Find a client by their portal login email (contact_email), case-insensitive. */
+function getClientByEmail(email) {
+  const target = String(email || '').trim().toLowerCase();
+  if (!target) return undefined;
+  return clients.find((c) => String(c.contact_email || '').toLowerCase() === target);
 }
 
 /** Build a URL-safe id from the business name plus a short random suffix. */
@@ -273,6 +294,82 @@ function updateClient(id, data) {
 }
 
 /**
+ * Strip fields the client portal must never expose: WhatsApp/Claude
+ * credentials and the portal password hash.
+ */
+function sanitizeClientForPortal(client) {
+  const { whatsapp_token, claude_api_key, client_password, ...safe } = client;
+  return safe;
+}
+
+/**
+ * Update the subset of settings a client can change themselves via the
+ * client portal (business hours, system prompt, personality, contact
+ * details). Never touches phone_number_id, whatsapp_token, claude_api_key,
+ * quote_tier, price_list, active, etc. — those stay owner-only.
+ */
+function updatePortalSettings(id, data) {
+  const client = getClientById(id);
+  if (!client) return undefined;
+
+  const picked = {};
+  for (const field of CLIENT_PORTAL_SETTINGS_FIELDS) {
+    if (data[field] !== undefined) {
+      picked[field] = data[field];
+    }
+  }
+
+  if (picked.contact_email !== undefined) {
+    const target = String(picked.contact_email).trim().toLowerCase();
+    const clash = clients.find(
+      (c) => c.id !== id && String(c.contact_email || '').toLowerCase() === target
+    );
+    if (clash) {
+      const err = new Error('Another client already uses this email');
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
+  if (picked.business_hours !== undefined) {
+    picked.business_hours = {
+      ...DEFAULT_BUSINESS_HOURS,
+      ...client.business_hours,
+      ...picked.business_hours,
+    };
+  }
+
+  Object.assign(client, picked, { updated_at: new Date().toISOString() });
+  persist();
+  return client;
+}
+
+/**
+ * Replace a Tier 2 client's price list (the only thing the client portal's
+ * Price List page can change). Returns undefined if no client matches.
+ */
+function updatePriceList(id, priceList) {
+  const client = getClientById(id);
+  if (!client) return undefined;
+
+  client.price_list = sanitizePriceList(priceList);
+  client.updated_at = new Date().toISOString();
+  persist();
+  return client;
+}
+
+/** Set a client's portal password to an already-hashed value. */
+function setClientPasswordHash(id, hash) {
+  const client = getClientById(id);
+  if (!client) return undefined;
+
+  client.client_password = hash;
+  client.updated_at = new Date().toISOString();
+  persist();
+  return client;
+}
+
+/**
  * Remove a client by id. Returns true if a client was removed, false if
  * no client matched the given id.
  */
@@ -296,7 +393,12 @@ module.exports = {
   getActiveClients,
   getClientById,
   getClientByPhoneNumberId,
+  getClientByEmail,
   addClient,
   updateClient,
   deleteClient,
+  sanitizeClientForPortal,
+  updatePortalSettings,
+  updatePriceList,
+  setClientPasswordHash,
 };

@@ -45,6 +45,7 @@ function addQuote(entry) {
   const record = {
     id: crypto.randomUUID(),
     tier: 1,
+    status: 'pending',
     created_at: new Date().toISOString(),
     ...entry,
   };
@@ -140,7 +141,12 @@ function addPdfQuote(entry) {
   return record;
 }
 
-/** Update a quote's status (pending/approved/rejected/sent). */
+/**
+ * Update a quote's status. Tier 2 quotes move through the PDF approval
+ * lifecycle (pending -> approved -> sent, or pending -> rejected); both
+ * tiers can also be marked quoted/won/lost from the client portal once the
+ * job outcome is known.
+ */
 function setQuoteStatus(id, status) {
   const quote = getQuoteById(id);
   if (!quote) return undefined;
