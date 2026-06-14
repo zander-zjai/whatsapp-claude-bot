@@ -2,6 +2,11 @@
 
 require('dotenv').config();
 
+if (process.env.CLIENTS_JSON) {
+  const fs = require('fs');
+  fs.writeFileSync('clients.json', process.env.CLIENTS_JSON);
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
