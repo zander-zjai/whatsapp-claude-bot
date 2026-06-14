@@ -27,6 +27,11 @@ export const DEFAULT_CLIENT_VALUES = {
     days: [1, 2, 3, 4, 5],
   },
   quote_requests_enabled: false,
+  quote_tier: 1,
+  price_list: [],
+  logo_url: '',
+  brand_color: '#1E3A8A',
+  quote_terms: '',
 };
 
 const inputClass =
@@ -64,11 +69,40 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
     });
   }
 
+  function addPriceListItem() {
+    setValues((prev) => ({
+      ...prev,
+      price_list: [...prev.price_list, { item: '', unit: '', price: '' }],
+    }));
+  }
+
+  function updatePriceListItem(index, field, value) {
+    setValues((prev) => ({
+      ...prev,
+      price_list: prev.price_list.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)),
+    }));
+  }
+
+  function removePriceListItem(index) {
+    setValues((prev) => ({
+      ...prev,
+      price_list: prev.price_list.filter((_, i) => i !== index),
+    }));
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     onSubmit({
       ...values,
       monthly_message_limit: Number(values.monthly_message_limit) || 0,
+      quote_tier: Number(values.quote_tier) === 2 ? 2 : 1,
+      price_list: values.price_list
+        .map((entry) => ({
+          item: String(entry.item || '').trim(),
+          unit: String(entry.unit || '').trim(),
+          price: Number(entry.price) || 0,
+        }))
+        .filter((entry) => entry.item),
     });
   }
 
@@ -374,9 +408,131 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           </button>
           <span className="text-sm text-gray-700">
             When customers ask for a quote, Zara collects their name, contact number, item,
-            size, and quantity, then sends the owner a summary via WhatsApp.
+            size, and quantity.
           </span>
         </label>
+
+        {values.quote_requests_enabled && (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className={labelClass}>Quoting Tier</label>
+              <select
+                value={values.quote_tier}
+                onChange={(e) => set('quote_tier', Number(e.target.value))}
+                className={inputClass}
+              >
+                <option value={1}>Tier 1 — Quote Assist (notify owner, owner quotes manually)</option>
+                <option value={2}>Tier 2 — Auto PDF Quote (generate branded PDF for owner approval)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {Number(values.quote_tier) === 2
+                  ? 'Zara calculates a total from the price list below and generates a branded PDF. The owner replies #approve or #reject before it\'s sent to the customer.'
+                  : 'Zara sends the owner a summary of the request; the owner prepares and sends the final quote manually.'}
+              </p>
+            </div>
+
+            {Number(values.quote_tier) === 2 && (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Brand Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={values.brand_color}
+                        onChange={(e) => set('brand_color', e.target.value)}
+                        className="h-10 w-14 rounded border border-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={values.brand_color}
+                        onChange={(e) => set('brand_color', e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Logo URL</label>
+                    <input
+                      type="text"
+                      value={values.logo_url}
+                      onChange={(e) => set('logo_url', e.target.value)}
+                      placeholder="https://example.com/logo.png"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Price List</label>
+                  <div className="space-y-2">
+                    {values.price_list.map((entry, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={entry.item}
+                          onChange={(e) => updatePriceListItem(index, 'item', e.target.value)}
+                          placeholder="Item (e.g. Vinyl Banner)"
+                          className={`${inputClass} flex-[2]`}
+                        />
+                        <input
+                          type="text"
+                          value={entry.unit}
+                          onChange={(e) => updatePriceListItem(index, 'unit', e.target.value)}
+                          placeholder="Unit (e.g. per sqm)"
+                          className={`${inputClass} flex-1`}
+                        />
+                        <input
+                          type="number"
+                          value={entry.price}
+                          onChange={(e) => updatePriceListItem(index, 'price', e.target.value)}
+                          placeholder="Price (R)"
+                          min="0"
+                          step="0.01"
+                          className={`${inputClass} flex-1`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePriceListItem(index)}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addPriceListItem}
+                    className="mt-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    + Add Price List Item
+                  </button>
+                  {values.price_list.length === 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Tier 2 needs at least one price list item — without one, quotes fall back to
+                      Tier 1 behaviour.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Quote Terms & Conditions</label>
+                  <textarea
+                    value={values.quote_terms}
+                    onChange={(e) => set('quote_terms', e.target.value)}
+                    rows={3}
+                    placeholder="This quote is valid for 7 days from the date of issue. Prices are subject to change after the validity period..."
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Shown on the generated PDF. Leave blank to use the default terms.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Status */}

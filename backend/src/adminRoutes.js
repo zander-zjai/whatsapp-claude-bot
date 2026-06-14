@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { log, logError } = require('./logger');
@@ -277,6 +278,23 @@ router.get('/quotes', (req, res) => {
     : quoteManager.getAllQuotes(opts);
 
   res.json({ quotes });
+});
+
+/** GET /admin/quotes/:id/pdf — stream the generated PDF for a Tier 2 quote. */
+router.get('/quotes/:id/pdf', (req, res) => {
+  const quote = quoteManager.getQuoteById(req.params.id);
+  if (!quote || quote.tier !== 2) {
+    return res.status(404).json({ error: 'Quote not found' });
+  }
+
+  const pdfPath = quoteManager.getPdfFilePath(quote.id);
+  if (!fs.existsSync(pdfPath)) {
+    return res.status(404).json({ error: 'PDF not available' });
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="quote-${quote.id.slice(0, 8)}.pdf"`);
+  fs.createReadStream(pdfPath).pipe(res);
 });
 
 module.exports = router;

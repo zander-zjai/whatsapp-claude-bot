@@ -25,6 +25,45 @@
         "days": [1, 2, 3, 4, 5]
       },
       "quote_requests_enabled": true,
+      "quote_tier": 1,
+      "created_at": "2026-06-10T00:00:00.000Z",
+      "updated_at": "2026-06-10T00:00:00.000Z"
+    },
+    {
+      "id": "cape_print_signage_d4e5f6",
+      "name": "Cape Print & Signage",
+      "business_type": "Other",
+      "contact_person": "Sipho Nkosi",
+      "contact_email": "sipho@capeprint.example",
+      "contact_phone": "+27831234567",
+      "phone_number_id": "987654321098765",
+      "whatsapp_token": "EAAG_REPLACE_WITH_REAL_WHATSAPP_TOKEN",
+      "claude_api_key": "sk-ant-REPLACE_WITH_REAL_CLAUDE_API_KEY",
+      "use_platform_key": false,
+      "monthly_message_limit": 1000,
+      "bot_personality": "Professional",
+      "bot_name": "Zara",
+      "system_prompt": "You are Zara, a helpful assistant for Cape Print & Signage, a print and signage shop. You help customers with quotes for banners, signs, stickers and business cards, and answer questions about turnaround times and delivery. Be friendly, concise, and professional. Always reply in the same language the customer uses.",
+      "active": true,
+      "owner_phone": "+27831234567",
+      "business_hours": {
+        "enabled": true,
+        "timezone": "Africa/Johannesburg",
+        "open": "08:00",
+        "close": "17:00",
+        "days": [1, 2, 3, 4, 5]
+      },
+      "quote_requests_enabled": true,
+      "quote_tier": 2,
+      "price_list": [
+        { "item": "Vinyl Banner", "unit": "per sqm", "price": 450 },
+        { "item": "Correx Board Sign", "unit": "per sqm", "price": 380 },
+        { "item": "Vehicle Sticker", "unit": "each", "price": 250 },
+        { "item": "Business Cards (box of 100)", "unit": "per box", "price": 350 }
+      ],
+      "logo_url": "",
+      "brand_color": "#1E3A8A",
+      "quote_terms": "This quote is valid for 7 days from the date of issue. Prices are subject to change after the validity period. A 50% deposit is required before work begins. All prices are in South African Rand (ZAR) and exclude delivery.",
       "created_at": "2026-06-10T00:00:00.000Z",
       "updated_at": "2026-06-10T00:00:00.000Z"
     }

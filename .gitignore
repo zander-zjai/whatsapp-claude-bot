@@ -11,6 +11,7 @@ logs.json
 settings.json
 conversations.json
 quotes.json
+quote-pdfs/
 error-logs/
 backups/
 data/

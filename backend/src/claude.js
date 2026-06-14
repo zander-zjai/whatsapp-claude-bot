@@ -58,7 +58,7 @@ function buildSystemPrompt(client, options = {}) {
   }
 
   if (options.quoteRequestsEnabled) {
-    parts.push(quoteManager.QUOTE_REQUEST_INSTRUCTIONS);
+    parts.push(quoteManager.buildQuoteInstructions(client));
   }
 
   return parts.join('\n\n');

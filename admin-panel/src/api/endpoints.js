@@ -44,3 +44,6 @@ export const setConversationHandover = (clientId, customerNumber, active) =>
 // --- Quote requests ---
 export const getQuotes = (params = {}) =>
   apiClient.get('/admin/quotes', { params }).then((r) => r.data.quotes);
+
+export const getQuotePdfBlob = (id) =>
+  apiClient.get(`/admin/quotes/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data);

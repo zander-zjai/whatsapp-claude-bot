@@ -29,7 +29,13 @@ create one, or have them send you:
 7. (Optional) **Business hours** — timezone, open/close time, and open days,
    if they want an automatic "we're closed" reply outside those hours.
 8. Whether they want Zara to **collect quote requests** (name, contact,
-   item, size, quantity) and notify them by WhatsApp.
+   item, size, quantity) and notify them by WhatsApp — and which **Quoting
+   Tier**:
+   - **Tier 1 (Quote Assist)** — owner gets a summary and quotes manually.
+   - **Tier 2 (Auto PDF Quote)** — needs a **price list** (item/unit/price),
+     a **brand color**, an optional **logo URL**, and optional **quote
+     terms**. Zara calculates a total and generates a branded PDF; the owner
+     replies `#approve`/`#reject` before it's sent to the customer.
 
 ---
 
@@ -74,6 +80,14 @@ create one, or have them send you:
 
    **Quote Requests**
    - Toggle on if Zara should collect quote details and notify the owner.
+   - Choose the **Quoting Tier**:
+     - **Tier 1 — Quote Assist**: owner gets a WhatsApp summary and quotes
+       manually.
+     - **Tier 2 — Auto PDF Quote**: also set a **brand color**, optional
+       **logo URL**, a **price list** (item / unit / price rows), and
+       optional **quote terms**. Zara calculates a total and generates a
+       branded PDF for owner approval (`#approve`/`#reject`). If the price
+       list is left empty, the client falls back to Tier 1 behaviour.
 
    **Status**
    - Leave **Active** on so the bot responds immediately.
@@ -132,8 +146,14 @@ pointed at your shared backend:
 6. If **Business Hours** are enabled, message outside those hours and
    confirm the "We are closed..." reply.
 7. If **Quote Requests** are enabled, ask for a quote and provide all the
-   details Zara asks for — confirm it appears on the **Quote Requests** page
-   and the owner gets a WhatsApp summary.
+   details Zara asks for — confirm it appears on the **Quote Requests** page.
+   - **Tier 1**: the owner gets a WhatsApp summary.
+   - **Tier 2**: the owner gets a "New quote ready for approval" notification
+     with the calculated total. Reply `#approve` — the customer should
+     receive a branded PDF quote via WhatsApp, and the quote's status should
+     move to `sent` (downloadable from the **Quote Requests** page). Reply
+     `#reject` instead to confirm the quote is marked `rejected` and no PDF
+     is sent to the customer.
 
 If something doesn't work, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 

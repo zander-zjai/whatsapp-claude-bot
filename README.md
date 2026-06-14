@@ -48,9 +48,12 @@ admin panel.
   the owner regardless of hours
 - **Persistent conversation history per contact** (`conversations.json`) — Zara
   greets returning customers by name if they previously introduced themselves
-- **Quote request detection**: Zara collects name, contact number, item, size, and
-  quantity through natural conversation, then sends the owner a formatted WhatsApp
-  summary and stores it in `quotes.json`
+- **Two-tier quoting**: Zara collects name, contact number, item, size, and
+  quantity through natural conversation, then either (Tier 1) sends the owner a
+  formatted WhatsApp summary to quote manually, or (Tier 2) calculates a total
+  from the client's price list, generates a branded PDF quote, and asks the
+  owner to `#approve`/`#reject` before it's sent to the customer. Stored in
+  `quotes.json`
 - Per-message logging to `logs.json` (timestamp, customer, message, reply, response time, status)
 - Graceful fallback message if Claude fails; non-text messages ignored silently
 - `GET /health` — status, uptime, active/total client counts, active conversations (for uptime monitors)
@@ -65,7 +68,8 @@ admin panel.
 - Conversations page: every active conversation, last message, handover status
   (Active / Awaiting Human / Handover), and a manual take-over/release toggle
 - Quote Requests page: every quote collected by Zara (name, contact, item, size,
-  quantity, customer WhatsApp number)
+  quantity, customer WhatsApp number), plus tier, total, status, and a PDF
+  download for Tier 2 quotes
 - Settings: platform Claude API key, webhook base URL, fallback message, conversation memory length, admin password change
 - Recent server errors viewable via `GET /admin/errors`
 - Error boundary for graceful recovery from unexpected UI errors
@@ -91,6 +95,7 @@ whatsapp-claude-bot/
 │   ├── settings.json         # platform settings (auto-created, gitignored)
 │   ├── conversations.json    # per-contact conversation state + handover status (auto-created, gitignored)
 │   ├── quotes.json           # quote requests collected by Zara (auto-created, gitignored)
+│   ├── quote-pdfs/            # generated Tier 2 PDF quotes (auto-created, gitignored)
 │   ├── .env / .env.example / .env.production.example
 │   ├── package.json
 │   └── src/
@@ -107,9 +112,10 @@ whatsapp-claude-bot/
 │       ├── errorLogger.js    # daily-rotated error logs (7-day retention)
 │       ├── phone.js          # phone number masking + normalization
 │       ├── conversationManager.js # persisted per-contact state + handover status
-│       ├── quoteManager.js   # quote request capture + storage
+│       ├── quoteManager.js   # quote request capture + storage + Tier 2 totals
+│       ├── pdfGenerator.js   # branded PDF quote generation (Tier 2, pdfkit)
 │       ├── businessHours.js  # business-hours check + closed-hours message
-│       ├── handover.js       # owner-command parsing + urgent-keyword detection
+│       ├── handover.js       # owner-command parsing + urgent-keyword detection (incl. #approve/#reject)
 │       └── logger.js         # tiny timestamped logger
 │
 └── admin-panel/
@@ -387,6 +393,7 @@ Railway (static service), or Nginx instead of Vercel if preferred. Same
 | `GET`    | `/admin/conversations`     | JWT         | List conversations + handover status (`?client_id=`) |
 | `POST`   | `/admin/conversations/handover` | JWT    | Set handover state: `{ client_id, customer_number, active }` |
 | `GET`    | `/admin/quotes`            | JWT         | List quote requests (`?client_id=&limit=`) |
+| `GET`    | `/admin/quotes/:id/pdf`    | JWT         | Download the generated PDF for a Tier 2 quote |
 
 JWT auth: send `Authorization: Bearer <token>` (token from `/admin/login`,
 valid 8h). `POST /admin/login` is rate-limited to 5 attempts / 15 min.
@@ -469,11 +476,47 @@ greet them by name.
 When **Quote Requests** is enabled for a client, Zara asks for whatever is
 missing — name, contact number, item/specs, size, and quantity — through
 natural conversation. Once all five are collected, the request is stored in
-`backend/quotes.json` and the owner gets a WhatsApp summary:
+`backend/quotes.json`. What happens next depends on the client's **Quoting
+Tier**:
+
+#### Tier 1 — Quote Assist (default)
+
+The owner gets a WhatsApp summary:
 
 > "New Quote Request from Jane Doe: ..."
 
-View all quote requests in the admin panel's **Quote Requests** page.
+The owner then prepares and sends the final quote manually.
+
+#### Tier 2 — Auto PDF Quote
+
+Configure a **price list** (`price_list: [{ item, unit, price }]`), **brand
+color**, **logo URL**, and optional **quote terms** in the client's settings.
+When Zara collects a quote request, she also matches the customer's needs
+against the price list and returns `line_items: [{ item, quantity }]`. The
+backend then:
+
+1. Recalculates unit prices and totals from the price list (not from
+   anything Claude guessed).
+2. Generates a branded PDF (business logo, name, brand color, line items,
+   totals, a 7-day validity date, and terms & conditions) via `pdfkit`,
+   stored under `backend/quote-pdfs/<id>.pdf`.
+3. Notifies the owner:
+   > "New quote ready for approval — R1,234.00 for Jane Doe. Reply #approve
+   > to send or #reject to decline."
+4. Waits for the owner's decision:
+   - **`#approve`** — sends the PDF to the customer as a WhatsApp document
+     and marks the quote `sent`.
+   - **`#reject`** — marks the quote `rejected`; the owner follows up
+     manually. The PDF is **never** sent to the customer in this case.
+
+If `quote_tier` is `2` but `price_list` is empty, the client automatically
+falls back to Tier 1 behaviour.
+
+Quote statuses progress as `pending` → `approved` → `sent`, or `pending` →
+`rejected`.
+
+View all quote requests — including tier, total, status, and a PDF download
+for Tier 2 quotes — in the admin panel's **Quote Requests** page.
 
 ---
 
@@ -512,10 +555,11 @@ warm — useful on hosting tiers that spin down idle services.
 
 - **Only text messages** are handled by the webhook. Images, audio, stickers,
   etc. are ignored.
-- `clients.json`, `logs.json`, `settings.json`, `conversations.json`, and
-  `quotes.json` hold secrets/PII in plaintext — keep them out of version
-  control (already in `.gitignore`) and lock down access to `DATA_DIR` in
-  production. See [SECURITY.md](SECURITY.md) for the full production security
+- `clients.json`, `logs.json`, `settings.json`, `conversations.json`,
+  `quotes.json`, and `quote-pdfs/` hold secrets/PII in plaintext — keep them
+  out of version control (already in `.gitignore`) and lock down access to
+  `DATA_DIR` in production. See [SECURITY.md](SECURITY.md) for the full
+  production security
   checklist.
 - The `POST /webhook` handler returns `200` to Meta immediately and processes
   the message asynchronously, so Meta won't retry on slow Claude responses.

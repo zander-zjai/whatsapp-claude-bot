@@ -20,13 +20,14 @@ function isFromOwner(client, from) {
 }
 
 // "#takeover", "#release", optionally followed by a customer number, e.g.
-// "#takeover +27821234567".
-const COMMAND_REGEX = /^#(takeover|release)\b\s*(\S+)?/i;
+// "#takeover +27821234567". "#approve"/"#reject" act on the most recent
+// pending Tier 2 quote and don't take a number argument.
+const COMMAND_REGEX = /^#(takeover|release|approve|reject)\b\s*(\S+)?/i;
 
 /**
  * Parse an owner command out of a WhatsApp message.
  *
- * @returns {{ command: 'takeover'|'release', number: string|null }|null}
+ * @returns {{ command: 'takeover'|'release'|'approve'|'reject', number: string|null }|null}
  *   null if the text isn't a recognized command.
  */
 function parseOwnerCommand(text) {
