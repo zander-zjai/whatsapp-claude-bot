@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useClientAuth } from '../../context/ClientAuthContext';
 import { getErrorMessage } from '../../api/client';
@@ -13,6 +13,14 @@ export default function ClientLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'Client Portal – ZJAI Technologies';
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
 
   if (isAuthenticated) {
     return <Navigate to="/client/dashboard" replace />;

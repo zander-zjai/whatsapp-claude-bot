@@ -32,6 +32,9 @@ export const DEFAULT_CLIENT_VALUES = {
   logo_url: '',
   brand_color: '#1E3A8A',
   quote_terms: '',
+  monthly_fee: 0,
+  payment_status: 'unpaid',
+  invoice_date: '',
 };
 
 const inputClass =
@@ -96,6 +99,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       ...values,
       monthly_message_limit: Number(values.monthly_message_limit) || 0,
       quote_tier: Number(values.quote_tier) === 2 ? 2 : 1,
+      monthly_fee: Number(values.monthly_fee) || 0,
       price_list: values.price_list
         .map((entry) => ({
           item: String(entry.item || '').trim(),
@@ -533,6 +537,42 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             )}
           </div>
         )}
+      </section>
+
+      {/* Billing */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-gray-900">Billing</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={labelClass}>Monthly Fee (R)</label>
+            <input
+              type="number"
+              name="monthly_fee"
+              value={values.monthly_fee}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Payment Status</label>
+            <select name="payment_status" value={values.payment_status} onChange={handleChange} className={inputClass}>
+              <option value="unpaid">Unpaid</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Invoice Date</label>
+            <input
+              type="date"
+              name="invoice_date"
+              value={values.invoice_date}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
+        </div>
       </section>
 
       {/* Status */}

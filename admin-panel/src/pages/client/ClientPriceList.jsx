@@ -99,20 +99,20 @@ export default function ClientPriceList() {
 
             <div className="space-y-2">
               {priceList.map((entry, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
                     value={entry.item}
                     onChange={(e) => updateItem(index, 'item', e.target.value)}
                     placeholder="Item (e.g. Vinyl Banner)"
-                    className={`${inputClass} flex-[2]`}
+                    className={`${inputClass} w-full sm:flex-[2]`}
                   />
                   <input
                     type="text"
                     value={entry.unit}
                     onChange={(e) => updateItem(index, 'unit', e.target.value)}
                     placeholder="Unit (e.g. per sqm)"
-                    className={`${inputClass} flex-1`}
+                    className={`${inputClass} w-full sm:flex-1`}
                   />
                   <input
                     type="number"
@@ -121,12 +121,12 @@ export default function ClientPriceList() {
                     placeholder="Price (R)"
                     min="0"
                     step="0.01"
-                    className={`${inputClass} flex-1`}
+                    className={`${inputClass} w-full sm:flex-1`}
                   />
                   <button
                     type="button"
                     onClick={() => removeItem(index)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 sm:w-auto"
                   >
                     Remove
                   </button>
@@ -137,7 +137,7 @@ export default function ClientPriceList() {
             <button
               type="button"
               onClick={addItem}
-              className="mt-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
             >
               + Add Price List Item
             </button>

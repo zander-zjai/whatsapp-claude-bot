@@ -151,7 +151,7 @@ export default function ClientQuotes() {
                             type="button"
                             onClick={() => handleAction(quote, 'approve')}
                             disabled={pendingId === quote.id}
-                            className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
+                            className="flex-1 rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
                           >
                             Approve
                           </button>
@@ -159,7 +159,7 @@ export default function ClientQuotes() {
                             type="button"
                             onClick={() => handleAction(quote, 'reject')}
                             disabled={pendingId === quote.id}
-                            className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                            className="flex-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
                           >
                             Reject
                           </button>
@@ -171,7 +171,7 @@ export default function ClientQuotes() {
                           type="button"
                           onClick={() => handleDownloadPdf(quote)}
                           disabled={pendingId === quote.id}
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
                         >
                           Download PDF
                         </button>
@@ -181,7 +181,7 @@ export default function ClientQuotes() {
                         value={OUTCOME_OPTIONS.includes(quote.status) ? quote.status : ''}
                         onChange={(e) => handleStatusChange(quote, e.target.value)}
                         disabled={pendingId === quote.id}
-                        className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
                       >
                         <option value="" disabled hidden>
                           Mark as…

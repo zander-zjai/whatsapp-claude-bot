@@ -9,6 +9,7 @@ import EditClient from './pages/EditClient';
 import ClientLogs from './pages/ClientLogs';
 import Conversations from './pages/Conversations';
 import QuoteRequests from './pages/QuoteRequests';
+import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import ClientLogin from './pages/client/ClientLogin';
 import ClientDashboard from './pages/client/ClientDashboard';
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/clients/:id/logs" element={<ClientLogs />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/quotes" element={<QuoteRequests />} />
+        <Route path="/billing" element={<Billing />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 

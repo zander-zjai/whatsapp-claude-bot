@@ -30,6 +30,9 @@ const EDITABLE_FIELDS = [
   'logo_url',
   'brand_color',
   'quote_terms',
+  'monthly_fee',
+  'payment_status',
+  'invoice_date',
 ];
 
 const REQUIRED_FIELDS = [
@@ -68,6 +71,9 @@ const DEFAULTS = {
   brand_color: '#1E3A8A',
   quote_terms: '',
   client_password: null,
+  monthly_fee: 0,
+  payment_status: 'unpaid',
+  invoice_date: '',
 };
 
 // Fields a client can change themselves via PUT /client/settings. Notably
@@ -238,6 +244,8 @@ function addClient(data) {
     quote_tier: Number(picked.quote_tier) === 2 ? 2 : 1,
     price_list: sanitizePriceList(picked.price_list),
     business_hours: { ...DEFAULT_BUSINESS_HOURS, ...(picked.business_hours || {}) },
+    monthly_fee: Number(picked.monthly_fee ?? DEFAULTS.monthly_fee) || 0,
+    payment_status: picked.payment_status === 'paid' ? 'paid' : 'unpaid',
     created_at: now,
     updated_at: now,
   };
@@ -286,6 +294,12 @@ function updateClient(id, data) {
       ...client.business_hours,
       ...picked.business_hours,
     };
+  }
+  if (picked.monthly_fee !== undefined) {
+    picked.monthly_fee = Number(picked.monthly_fee) || 0;
+  }
+  if (picked.payment_status !== undefined) {
+    picked.payment_status = picked.payment_status === 'paid' ? 'paid' : 'unpaid';
   }
 
   Object.assign(client, picked, { updated_at: new Date().toISOString() });
