@@ -33,6 +33,7 @@ const EDITABLE_FIELDS = [
   'monthly_fee',
   'payment_status',
   'invoice_date',
+  'onboarding_checklist',
 ];
 
 const REQUIRED_FIELDS = [
@@ -53,6 +54,16 @@ const DEFAULT_BUSINESS_HOURS = {
   open: '08:00',
   close: '17:00',
   days: [1, 2, 3, 4, 5],
+};
+
+// Fresh-copied per client in addClient/updateClient so clients never share
+// the same nested object reference.
+const DEFAULT_ONBOARDING_CHECKLIST = {
+  whatsapp_configured: false,
+  system_prompt_set: false,
+  business_hours_set: false,
+  owner_notifications_on: false,
+  first_payment_received: false,
 };
 
 const DEFAULTS = {
@@ -244,6 +255,7 @@ function addClient(data) {
     quote_tier: Number(picked.quote_tier) === 2 ? 2 : 1,
     price_list: sanitizePriceList(picked.price_list),
     business_hours: { ...DEFAULT_BUSINESS_HOURS, ...(picked.business_hours || {}) },
+    onboarding_checklist: { ...DEFAULT_ONBOARDING_CHECKLIST, ...(picked.onboarding_checklist || {}) },
     monthly_fee: Number(picked.monthly_fee ?? DEFAULTS.monthly_fee) || 0,
     payment_status: picked.payment_status === 'paid' ? 'paid' : 'unpaid',
     created_at: now,
@@ -300,6 +312,13 @@ function updateClient(id, data) {
   }
   if (picked.payment_status !== undefined) {
     picked.payment_status = picked.payment_status === 'paid' ? 'paid' : 'unpaid';
+  }
+  if (picked.onboarding_checklist !== undefined) {
+    picked.onboarding_checklist = {
+      ...DEFAULT_ONBOARDING_CHECKLIST,
+      ...client.onboarding_checklist,
+      ...picked.onboarding_checklist,
+    };
   }
 
   Object.assign(client, picked, { updated_at: new Date().toISOString() });

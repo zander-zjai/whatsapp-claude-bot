@@ -542,7 +542,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       {/* Billing */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Billing</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className={labelClass}>Monthly Fee (R)</label>
             <input
@@ -554,6 +554,17 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
               step="0.01"
               className={inputClass}
             />
+          </div>
+          <div>
+            <label className={labelClass}>Service Tier</label>
+            <select
+              value={values.quote_tier}
+              onChange={(e) => set('quote_tier', Number(e.target.value))}
+              className={inputClass}
+            >
+              <option value={1}>Tier 1 — Quote Assist</option>
+              <option value={2}>Tier 2 — Auto PDF Quote</option>
+            </select>
           </div>
           <div>
             <label className={labelClass}>Payment Status</label>

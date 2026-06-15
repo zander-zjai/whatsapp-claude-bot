@@ -1,4 +1,4 @@
-export const BUSINESS_TYPES = ['Restaurant', 'Retail', 'Medical', 'Legal', 'Real Estate', 'Other'];
+export const BUSINESS_TYPES = ['Restaurant', 'Retail', 'Medical', 'Legal', 'Real Estate', 'Signage', 'Other'];
 
 export const BOT_PERSONALITIES = ['Professional', 'Friendly', 'Formal', 'Casual'];
 

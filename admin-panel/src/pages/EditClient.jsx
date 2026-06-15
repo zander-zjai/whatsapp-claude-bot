@@ -7,40 +7,55 @@ import ErrorMessage from '../components/ErrorMessage';
 import { getClient, updateClient } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 
-function SetupChecklist({ client }) {
-  const items = [
-    {
-      label: 'WhatsApp number configured',
-      done: Boolean(client.phone_number_id && client.whatsapp_token),
-    },
-    {
-      label: 'Zara system prompt set',
-      done: Boolean(client.system_prompt && client.system_prompt.trim()),
-    },
-    {
-      label: 'Business hours set',
-      done: Boolean(client.business_hours?.enabled),
-    },
-    {
-      label: 'Owner WhatsApp notifications on',
-      done: Boolean(client.owner_phone),
-    },
-    {
-      label: 'First payment received',
-      done: client.payment_status === 'paid',
-    },
-  ];
+const CHECKLIST_ITEMS = [
+  { key: 'whatsapp_configured', label: 'WhatsApp number configured' },
+  { key: 'system_prompt_set', label: 'Zara system prompt set' },
+  { key: 'business_hours_set', label: 'Business hours set' },
+  { key: 'owner_notifications_on', label: 'Owner WhatsApp notifications on' },
+  { key: 'first_payment_received', label: 'First payment received' },
+];
+
+function SetupChecklist({ client, onChange }) {
+  const [error, setError] = useState('');
+  const [savingKey, setSavingKey] = useState(null);
+  const checklist = client.onboarding_checklist || {};
+
+  async function toggle(key) {
+    setError('');
+    const previous = checklist;
+    const updated = { ...checklist, [key]: !checklist[key] };
+    setSavingKey(key);
+    onChange(updated);
+    try {
+      await updateClient(client.id, { onboarding_checklist: updated });
+    } catch (err) {
+      onChange(previous);
+      setError(getErrorMessage(err, 'Failed to save checklist'));
+    } finally {
+      setSavingKey(null);
+    }
+  }
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h2 className="mb-4 text-base font-semibold text-gray-900">Setup Checklist</h2>
+      <ErrorMessage message={error} />
       <ul className="space-y-2">
-        {items.map((item) => (
-          <li key={item.label} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={item.done} disabled className="h-4 w-4 rounded border-gray-300" />
-            <span className={item.done ? 'text-gray-700' : 'text-gray-500'}>{item.label}</span>
-          </li>
-        ))}
+        {CHECKLIST_ITEMS.map((item) => {
+          const done = Boolean(checklist[item.key]);
+          return (
+            <li key={item.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={done}
+                disabled={savingKey === item.key}
+                onChange={() => toggle(item.key)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <span className={done ? 'text-gray-700' : 'text-gray-500'}>{item.label}</span>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -96,7 +111,12 @@ export default function EditClient() {
 
       {!loading && !loadError && client && (
         <div className="mx-auto max-w-3xl space-y-6">
-          <SetupChecklist client={client} />
+          <SetupChecklist
+            client={client}
+            onChange={(onboarding_checklist) =>
+              setClient((prev) => ({ ...prev, onboarding_checklist }))
+            }
+          />
           <ClientForm
             initialValues={client}
             onSubmit={handleSubmit}

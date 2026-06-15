@@ -66,6 +66,7 @@ export default function Billing() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Service Tier</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Monthly Fee</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Payment Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Invoice Date</th>
@@ -75,6 +76,7 @@ export default function Billing() {
               {clients.map((client) => (
                 <tr key={client.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{client.name}</td>
+                  <td className="px-4 py-3 text-gray-600">Tier {Number(client.quote_tier) === 2 ? 2 : 1}</td>
                   <td className="px-4 py-3 text-gray-600">R{(Number(client.monthly_fee) || 0).toFixed(2)}</td>
                   <td className="px-4 py-3">
                     <button
@@ -95,7 +97,7 @@ export default function Billing() {
               ))}
               {clients.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                     No clients yet.
                   </td>
                 </tr>
