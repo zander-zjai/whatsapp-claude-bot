@@ -6,7 +6,7 @@ const SETTINGS_FILE = 'settings.json';
 
 const DEFAULT_SETTINGS = {
   platform_claude_api_key: '',
-  webhook_base_url: 'https://yourdomain.com',
+  webhook_base_url: 'https://whatsapp-claude-bot-production-bed5.up.railway.app',
   fallback_message: "Sorry, I'm unavailable right now. Please try again shortly.",
   max_conversation_memory: 10,
   // Optional admin credential override. When null, server.js falls back to

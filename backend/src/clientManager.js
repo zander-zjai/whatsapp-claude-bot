@@ -32,7 +32,9 @@ const EDITABLE_FIELDS = [
   'quote_terms',
   'monthly_fee',
   'payment_status',
-  'invoice_date',
+  'service_package',
+  'last_invoice_date',
+  'next_invoice_date',
   'onboarding_checklist',
 ];
 
@@ -82,9 +84,11 @@ const DEFAULTS = {
   brand_color: '#1E3A8A',
   quote_terms: '',
   client_password: null,
-  monthly_fee: 0,
+  monthly_fee: 3000,
   payment_status: 'unpaid',
-  invoice_date: '',
+  service_package: '',
+  last_invoice_date: '',
+  next_invoice_date: '',
 };
 
 // Fields a client can change themselves via PUT /client/settings. Notably

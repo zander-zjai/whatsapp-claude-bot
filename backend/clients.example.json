@@ -29,7 +29,9 @@
       "client_password": null,
       "monthly_fee": 1500,
       "payment_status": "paid",
-      "invoice_date": "2026-06-01",
+      "service_package": "zara_starter",
+      "last_invoice_date": "2026-06-01",
+      "next_invoice_date": "2026-07-01",
       "onboarding_checklist": {
         "whatsapp_configured": true,
         "system_prompt_set": true,
@@ -78,7 +80,9 @@
       "client_password": null,
       "monthly_fee": 2500,
       "payment_status": "unpaid",
-      "invoice_date": "2026-06-05",
+      "service_package": "ai_receptionist",
+      "last_invoice_date": "2026-06-05",
+      "next_invoice_date": "2026-07-05",
       "onboarding_checklist": {
         "whatsapp_configured": true,
         "system_prompt_set": true,

@@ -5,6 +5,12 @@ import ErrorMessage from '../components/ErrorMessage';
 import { getClients, updateClient } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { formatDate } from '../utils/format';
+import { SERVICE_PACKAGES } from '../utils/constants';
+
+function servicePackageLabel(value) {
+  const pkg = SERVICE_PACKAGES.find((p) => p.value === value);
+  return pkg ? pkg.label : '—';
+}
 
 export default function Billing() {
   const [clients, setClients] = useState([]);
@@ -66,17 +72,18 @@ export default function Billing() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Service Tier</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Service Package</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Monthly Fee</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Payment Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Invoice Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Invoice</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Next Invoice</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {clients.map((client) => (
                 <tr key={client.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{client.name}</td>
-                  <td className="px-4 py-3 text-gray-600">Tier {Number(client.quote_tier) === 2 ? 2 : 1}</td>
+                  <td className="px-4 py-3 text-gray-600">{servicePackageLabel(client.service_package)}</td>
                   <td className="px-4 py-3 text-gray-600">R{(Number(client.monthly_fee) || 0).toFixed(2)}</td>
                   <td className="px-4 py-3">
                     <button
@@ -92,12 +99,13 @@ export default function Billing() {
                       {client.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{client.invoice_date ? formatDate(client.invoice_date) : '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{client.last_invoice_date ? formatDate(client.last_invoice_date) : '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{client.next_invoice_date ? formatDate(client.next_invoice_date) : '—'}</td>
                 </tr>
               ))}
               {clients.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     No clients yet.
                   </td>
                 </tr>

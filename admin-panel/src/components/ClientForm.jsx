@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BUSINESS_TYPES, BOT_PERSONALITIES } from '../utils/constants';
+import { BUSINESS_TYPES, BOT_PERSONALITIES, SERVICE_PACKAGES } from '../utils/constants';
 import { formatDateTime } from '../utils/format';
 import ErrorMessage from './ErrorMessage';
 
@@ -32,9 +32,11 @@ export const DEFAULT_CLIENT_VALUES = {
   logo_url: '',
   brand_color: '#1E3A8A',
   quote_terms: '',
-  monthly_fee: 0,
+  monthly_fee: 3000,
   payment_status: 'unpaid',
-  invoice_date: '',
+  service_package: '',
+  last_invoice_date: '',
+  next_invoice_date: '',
 };
 
 const inputClass =
@@ -542,7 +544,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       {/* Billing */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Billing</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClass}>Monthly Fee (R)</label>
             <input
@@ -556,14 +558,14 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             />
           </div>
           <div>
-            <label className={labelClass}>Service Tier</label>
-            <select
-              value={values.quote_tier}
-              onChange={(e) => set('quote_tier', Number(e.target.value))}
-              className={inputClass}
-            >
-              <option value={1}>Tier 1 — Quote Assist</option>
-              <option value={2}>Tier 2 — Auto PDF Quote</option>
+            <label className={labelClass}>Service Package</label>
+            <select name="service_package" value={values.service_package} onChange={handleChange} className={inputClass}>
+              <option value="">— Not set —</option>
+              {SERVICE_PACKAGES.map((pkg) => (
+                <option key={pkg.value} value={pkg.value}>
+                  {pkg.label} (R{pkg.price.toLocaleString()}/mo)
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -574,11 +576,21 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             </select>
           </div>
           <div>
-            <label className={labelClass}>Invoice Date</label>
+            <label className={labelClass}>Last Invoice Date</label>
             <input
               type="date"
-              name="invoice_date"
-              value={values.invoice_date}
+              name="last_invoice_date"
+              value={values.last_invoice_date}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Next Invoice Date</label>
+            <input
+              type="date"
+              name="next_invoice_date"
+              value={values.next_invoice_date}
               onChange={handleChange}
               className={inputClass}
             />
