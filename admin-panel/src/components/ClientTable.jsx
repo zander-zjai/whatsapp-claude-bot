@@ -1,5 +1,26 @@
 import { Link } from 'react-router-dom';
 import { formatDate } from '../utils/format';
+import { SERVICE_PACKAGES } from '../utils/constants';
+
+function ServiceBadges({ servicePackage }) {
+  const pkg = SERVICE_PACKAGES.find((p) => p.value === servicePackage);
+  if (!pkg) return <span className="text-gray-400 text-xs">—</span>;
+  const features = pkg.features || [];
+  return (
+    <div className="flex flex-wrap gap-1">
+      {features.includes('vapi') && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+          📞 AI Receptionist
+        </span>
+      )}
+      {features.includes('whatsapp') && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+          💬 WhatsApp Bot
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function ClientTable({ clients, onToggleActive, onDelete }) {
   if (clients.length === 0) {
@@ -20,10 +41,9 @@ export default function ClientTable({ clients, onToggleActive, onDelete }) {
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Business Type</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">WhatsApp Number ID</th>
+            <th className="px-4 py-3 text-left font-semibold text-gray-600">Services</th>
             <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Messages Today</th>
+            <th className="px-4 py-3 text-left font-semibold text-gray-600">Msgs Today</th>
             <th className="px-4 py-3 text-left font-semibold text-gray-600">Date Added</th>
             <th className="px-4 py-3 text-right font-semibold text-gray-600">Actions</th>
           </tr>
@@ -31,9 +51,13 @@ export default function ClientTable({ clients, onToggleActive, onDelete }) {
         <tbody className="divide-y divide-gray-100">
           {clients.map((client) => (
             <tr key={client.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium text-gray-900">{client.name}</td>
-              <td className="px-4 py-3 text-gray-600">{client.business_type || '—'}</td>
-              <td className="px-4 py-3 font-mono text-xs text-gray-600">{client.phone_number_id}</td>
+              <td className="px-4 py-3">
+                <p className="font-medium text-gray-900">{client.name}</p>
+                <p className="text-xs text-gray-400">{client.contact_person}</p>
+              </td>
+              <td className="px-4 py-3">
+                <ServiceBadges servicePackage={client.service_package} />
+              </td>
               <td className="px-4 py-3">
                 <button
                   type="button"

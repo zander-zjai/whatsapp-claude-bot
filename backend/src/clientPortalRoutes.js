@@ -190,6 +190,33 @@ router.get('/quotes/:id/pdf', (req, res) => {
 });
 
 // ------------------------------------------------------------------
+// Call logs (proxied from JARVIS — AI Receptionist clients)
+// ------------------------------------------------------------------
+
+/** GET /client/calls — returns call log entries for this client from JARVIS. */
+router.get('/calls', async (req, res) => {
+  const jarvisUrl = process.env.JARVIS_URL;
+  const apiKey = process.env.CALLS_API_KEY;
+
+  if (!jarvisUrl || !apiKey) {
+    return res.json({ calls: [] });
+  }
+
+  try {
+    const upstream = await fetch(
+      `${jarvisUrl}/calls?client_id=${encodeURIComponent(req.clientId)}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!upstream.ok) return res.json({ calls: [] });
+    const data = await upstream.json();
+    res.json(data);
+  } catch (err) {
+    console.error('[calls-proxy] Failed to fetch from JARVIS:', err.message);
+    res.json({ calls: [] });
+  }
+});
+
+// ------------------------------------------------------------------
 // Price list (Tier 2 only)
 // ------------------------------------------------------------------
 

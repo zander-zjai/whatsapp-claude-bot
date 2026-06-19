@@ -36,6 +36,10 @@ export const getClientPriceList = () => clientPortalApi.get('/client/pricelist')
 export const updateClientPriceList = (priceList) =>
   clientPortalApi.put('/client/pricelist', { price_list: priceList }).then((r) => r.data.price_list);
 
+// --- Call logs ---
+export const getClientCallLogs = () =>
+  clientPortalApi.get('/client/calls').then((r) => r.data.calls || []);
+
 // --- Settings ---
 export const getClientSettings = () =>
   clientPortalApi.get('/client/settings').then((r) => r.data.settings);

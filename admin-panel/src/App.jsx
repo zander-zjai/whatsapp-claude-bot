@@ -18,6 +18,7 @@ import ClientConversationDetail from './pages/client/ClientConversationDetail';
 import ClientQuotes from './pages/client/ClientQuotes';
 import ClientPriceList from './pages/client/ClientPriceList';
 import ClientSettings from './pages/client/ClientSettings';
+import ClientCallLogs from './pages/client/ClientCallLogs';
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
 
       <Route element={<ClientProtectedRoute />}>
         <Route path="/client/dashboard" element={<ClientDashboard />} />
+        <Route path="/client/calls" element={<ClientCallLogs />} />
         <Route path="/client/conversations" element={<ClientConversations />} />
         <Route path="/client/conversations/:customerNumber" element={<ClientConversationDetail />} />
         <Route path="/client/quotes" element={<ClientQuotes />} />
