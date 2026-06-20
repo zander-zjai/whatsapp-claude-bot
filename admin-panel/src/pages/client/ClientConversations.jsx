@@ -25,6 +25,24 @@ const STATUS_CLASSES = {
   handover: 'bg-blue-100 text-blue-700',
 };
 
+const LEAD_CLASSES = {
+  hot: 'bg-red-100 text-red-700',
+  warm: 'bg-orange-100 text-orange-700',
+  cold: 'bg-gray-100 text-gray-500',
+};
+
+function LeadBadge({ temperature, reason }) {
+  if (!temperature) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <span
+      className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${LEAD_CLASSES[temperature]}`}
+      title={reason || ''}
+    >
+      {temperature}
+    </span>
+  );
+}
+
 export default function ClientConversations() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +103,7 @@ export default function ClientConversations() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Message</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Active</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
               </tr>
@@ -92,7 +111,7 @@ export default function ClientConversations() {
             <tbody className="divide-y divide-gray-100">
               {conversations.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                     No conversations yet.
                   </td>
                 </tr>
@@ -116,6 +135,9 @@ export default function ClientConversations() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                       {formatDateTime(conv.last_message_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <LeadBadge temperature={conv.lead_temperature} reason={conv.lead_reason} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_CLASSES[status]}`}>

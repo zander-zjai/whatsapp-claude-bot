@@ -13,6 +13,7 @@ const { maskPhone, normalizeNumber } = require('./phone');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
 const quoteActions = require('./quoteActions');
+const leadTagger = require('./leadTagger');
 const pdfGenerator = require('./pdfGenerator');
 const businessHours = require('./businessHours');
 const handover = require('./handover');
@@ -435,10 +436,15 @@ async function processMessage({ from, phoneNumberId, text }) {
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);
-    reply = extracted.text;
     quote = extracted.quote;
 
-    // Persist the cleaned reply (marker stripped) so it's part of the
+    const tagged = leadTagger.extractLeadTag(extracted.text);
+    reply = tagged.text;
+    if (tagged.tag) {
+      conversationManager.setLeadTag(client.id, from, tagged.tag);
+    }
+
+    // Persist the cleaned reply (markers stripped) so it's part of the
     // next turn's context.
     memory.addMessage(client.id, from, 'assistant', reply);
   } catch (err) {

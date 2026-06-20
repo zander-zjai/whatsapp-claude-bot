@@ -4,6 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { log, logError } = require('./logger');
 const settingsManager = require('./settingsManager');
 const quoteManager = require('./quoteManager');
+const leadTagger = require('./leadTagger');
 
 const MODEL = 'claude-sonnet-4-5';
 const MAX_TOKENS = 1024;
@@ -60,6 +61,8 @@ function buildSystemPrompt(client, options = {}) {
   if (options.quoteRequestsEnabled) {
     parts.push(quoteManager.buildQuoteInstructions(client));
   }
+
+  parts.push(leadTagger.LEAD_TAG_INSTRUCTIONS);
 
   return parts.join('\n\n');
 }

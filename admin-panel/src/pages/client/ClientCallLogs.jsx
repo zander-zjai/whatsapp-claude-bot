@@ -13,6 +13,21 @@ function formatDateTime(iso) {
   });
 }
 
+const LEAD_CLASSES = {
+  hot: 'bg-red-100 text-red-700',
+  warm: 'bg-orange-100 text-orange-700',
+  cold: 'bg-gray-100 text-gray-500',
+};
+
+function LeadBadge({ tag }) {
+  if (!tag) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${LEAD_CLASSES[tag] || LEAD_CLASSES.cold}`}>
+      {tag}
+    </span>
+  );
+}
+
 function EndedBadge({ reason }) {
   const lower = (reason || '').toLowerCase();
   const isCustomer = lower.includes('customer');
@@ -73,6 +88,7 @@ export default function ClientCallLogs() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Date &amp; Time</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Caller</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Ended</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Summary</th>
               </tr>
             </thead>
@@ -89,6 +105,9 @@ export default function ClientCallLogs() {
                   <td className="px-4 py-3 font-medium text-gray-900">{call.caller || 'Unknown'}</td>
                   <td className="px-4 py-3">
                     <EndedBadge reason={call.ended_reason} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <LeadBadge tag={call.lead_tag} />
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {expanded === call.id ? (

@@ -55,10 +55,23 @@ function getConversation(clientId, customerNumber) {
       awaiting_human: false,
       last_message_at: null,
       last_message_preview: '',
+      lead_temperature: null,
+      lead_reason: '',
       updated_at: new Date().toISOString(),
     };
   }
   return conversations[key];
+}
+
+/** Update the conversation's lead-temperature tag (hot/warm/cold) + reason. */
+function setLeadTag(clientId, customerNumber, tag) {
+  const conv = getConversation(clientId, customerNumber);
+  if (!tag) return conv;
+  conv.lead_temperature = tag.temperature;
+  conv.lead_reason = tag.reason || '';
+  conv.updated_at = new Date().toISOString();
+  persist();
+  return conv;
 }
 
 /** Record an incoming customer message (updates last-seen metadata). */
@@ -168,6 +181,7 @@ module.exports = {
   setHandover,
   setAwaitingHuman,
   setCustomerName,
+  setLeadTag,
   findConversationByNumber,
   findMostRecent,
   getConversationsForClient,
