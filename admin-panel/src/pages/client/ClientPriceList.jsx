@@ -54,6 +54,45 @@ export default function ClientPriceList() {
     setPriceList((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function parseCsv(text) {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0) return [];
+
+    const firstCols = lines[0].split(',').map((c) => c.trim().toLowerCase());
+    const hasHeader = firstCols.includes('item');
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+    return dataLines
+      .map((line) => {
+        const cols = line.split(',').map((c) => c.trim());
+        const [item = '', unit = '', price = ''] = cols;
+        return { item, unit, price };
+      })
+      .filter((entry) => entry.item);
+  }
+
+  function handleCsvUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSaveError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const imported = parseCsv(String(reader.result || ''));
+        if (imported.length === 0) {
+          setSaveError('No rows found. Expected CSV columns: item,unit,price');
+          return;
+        }
+        setPriceList((prev) => [...prev, ...imported]);
+      } catch (err) {
+        setSaveError('Failed to read CSV file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaveError('');
@@ -95,7 +134,17 @@ export default function ClientPriceList() {
           <ErrorMessage message={saveError} />
 
           <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Price List</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-gray-900">Price List</h2>
+              <label className="cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Bulk Upload CSV
+                <input type="file" accept=".csv,text/csv" onChange={handleCsvUpload} className="hidden" />
+              </label>
+            </div>
+            <p className="-mt-2 mb-3 text-xs text-gray-500">
+              CSV columns: item, unit, price (header row optional, e.g. "Vinyl Banner,per sqm,150").
+              Uploaded rows are added to the list below — review then click Save.
+            </p>
 
             <div className="space-y-2">
               {priceList.map((entry, index) => (
