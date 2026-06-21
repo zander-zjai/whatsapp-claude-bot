@@ -30,49 +30,10 @@ jobs:
           npm run lint --if-present
           npm run build --if-present
 
-  deploy-backend:
-    name: Deploy backend to Railway
-    runs-on: ubuntu-latest
-    needs: lint
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        working-directory: backend
-        run: railway up --service "${{ secrets.RAILWAY_SERVICE }}" --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  deploy-admin-panel:
-    name: Deploy admin panel to Vercel
-    runs-on: ubuntu-latest
-    needs: lint
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel
-
-      - name: Pull Vercel project settings
-        working-directory: admin-panel
-        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build
-        working-directory: admin-panel
-        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
-
-      - name: Deploy
-        working-directory: admin-panel
-        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
+# Deploy jobs were removed (2026-06-21): the backend already auto-deploys via
+# Railway's own native GitHub integration (confirmed working independently of
+# this workflow), and the admin panel is deployed manually with `vercel --prod`
+# since the Vercel project has no Git integration configured. Both deploy jobs
+# here were failing on every push (missing/invalid RAILWAY_TOKEN/VERCEL_TOKEN
+# secrets) and just generating noisy failure-email spam without actually
+# deploying anything — this workflow now only runs lint/test as a CI check.

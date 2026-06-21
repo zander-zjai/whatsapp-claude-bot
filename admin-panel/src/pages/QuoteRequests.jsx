@@ -11,6 +11,7 @@ const STATUS_STYLES = {
   approved: 'bg-blue-100 text-blue-700',
   sent: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  needs_pricing: 'bg-orange-100 text-orange-700',
 };
 
 export default function QuoteRequests() {
@@ -132,7 +133,7 @@ export default function QuoteRequests() {
                     {maskPhoneNumber(quote.customer_number)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    {quote.tier === 2 ? (
+                    {quote.tier === 2 && quote.status !== 'needs_pricing' ? (
                       <button
                         type="button"
                         onClick={() => handleDownloadPdf(quote)}

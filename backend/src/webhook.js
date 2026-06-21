@@ -243,6 +243,12 @@ function buildQuoteNotification(quote, from) {
 
 /** WhatsApp notification sent to the owner when a Tier 2 PDF quote is ready for review. */
 function buildPdfQuoteNotification(record) {
+  if (record.status === 'needs_pricing') {
+    return (
+      `Quote request for ${record.name} (${record.item_description || 'their request'}) didn't match anything ` +
+      `on your price list — no PDF was generated. Please price it manually and follow up with them directly.`
+    );
+  }
   return (
     `New quote ready for approval — R${Number(record.total).toFixed(2)} for ${record.name}. ` +
     `Reply #approve to send or #reject to decline.`
@@ -253,8 +259,16 @@ function buildPdfQuoteNotification(record) {
  * Tier 2 flow: calculate the total from the client's price list, generate
  * the branded PDF, store it as a pending quote, and notify the owner for
  * approval. The PDF is NOT sent to the customer yet.
+ *
+ * If nothing on the price list matched (total is 0), the quote is marked
+ * "needs_pricing" instead of "pending" — this isn't an approvable state
+ * (the portal's Approve/Reject only render for status "pending"), so a
+ * zero-rand quote can never be one-click approved and sent to a customer.
+ * No PDF is generated for it either, since there's nothing real to show.
  */
 async function handleTier2Quote(client, from, quote, { items, total }) {
+  const needsPricing = total <= 0;
+
   const record = quoteManager.addPdfQuote({
     client_id: client.id,
     client_name: client.name,
@@ -266,14 +280,17 @@ async function handleTier2Quote(client, from, quote, { items, total }) {
     quantity: quote.quantity,
     line_items: items,
     total,
+    status: needsPricing ? 'needs_pricing' : 'pending',
   });
 
-  try {
-    const pdfBuffer = await pdfGenerator.generateQuotePdf(client, record);
-    quoteManager.savePdfFile(record.id, pdfBuffer);
-  } catch (err) {
-    logError(`[${client.name}] Failed to generate quote PDF:`, err.message);
-    errorLogger.logErrorToFile(`[${client.name}] Failed to generate quote PDF`, err);
+  if (!needsPricing) {
+    try {
+      const pdfBuffer = await pdfGenerator.generateQuotePdf(client, record);
+      quoteManager.savePdfFile(record.id, pdfBuffer);
+    } catch (err) {
+      logError(`[${client.name}] Failed to generate quote PDF:`, err.message);
+      errorLogger.logErrorToFile(`[${client.name}] Failed to generate quote PDF`, err);
+    }
   }
 
   await notifyOwner(client, buildPdfQuoteNotification(record));

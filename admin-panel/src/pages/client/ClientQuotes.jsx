@@ -14,6 +14,7 @@ const STATUS_STYLES = {
   quoted: 'bg-blue-100 text-blue-700',
   won: 'bg-green-100 text-green-700',
   lost: 'bg-gray-200 text-gray-700',
+  needs_pricing: 'bg-orange-100 text-orange-700',
 };
 
 const OUTCOME_OPTIONS = ['pending', 'quoted', 'won', 'lost'];
@@ -166,7 +167,7 @@ export default function ClientQuotes() {
                         </div>
                       )}
 
-                      {quote.tier === 2 && (
+                      {quote.tier === 2 && quote.status !== 'needs_pricing' && (
                         <button
                           type="button"
                           onClick={() => handleDownloadPdf(quote)}
