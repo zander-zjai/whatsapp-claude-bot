@@ -23,9 +23,7 @@ export default function Sidebar({ onNavigate }) {
     <div className="flex h-full flex-col justify-between p-4">
       <div>
         <div className="mb-6 flex items-center gap-2 px-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-ink">
-            Z
-          </div>
+          <img src="/icon-192.png" alt="ZJAI" className="h-9 w-9 rounded-lg" />
           <div>
             <p className="text-sm font-bold leading-tight text-cream">ZJAI Technologies</p>
             <p className="text-xs leading-tight text-cream-dim">Admin Panel</p>

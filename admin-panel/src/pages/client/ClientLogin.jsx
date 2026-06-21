@@ -45,9 +45,7 @@ export default function ClientLogin() {
     <div className="flex min-h-screen items-center justify-center bg-black px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-2xl font-bold text-ink">
-            Z
-          </div>
+          <img src="/icon-192.png" alt="ZJAI" className="mb-3 h-14 w-14 rounded-xl" />
           <h1 className="text-xl font-bold text-cream">ZJAI Technologies</h1>
           <p className="text-sm text-cream-dim">Client Portal</p>
         </div>

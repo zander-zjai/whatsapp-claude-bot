@@ -14,7 +14,7 @@ export default function Header({ title, onMenuClick }) {
       </div>
       <div className="flex items-center gap-2 text-sm font-medium text-cream-dim">
         <span className="hidden sm:inline">ZJAI Technologies</span>
-        <span className="text-lg">🟡</span>
+        <img src="/icon-192.png" alt="ZJAI" className="h-7 w-7 rounded-full" />
       </div>
     </header>
   );
