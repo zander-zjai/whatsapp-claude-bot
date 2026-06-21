@@ -1,4 +1,5 @@
 'use strict';
+// no-op: deliberate redeploy to verify price-list/settings persistence (2026-06-21)
 
 const fs = require('fs');
 const path = require('path');
