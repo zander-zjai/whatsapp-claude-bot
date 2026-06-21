@@ -204,6 +204,7 @@ router.put('/settings', (req, res) => {
   const {
     platform_claude_api_key,
     webhook_base_url,
+    client_portal_url,
     fallback_message,
     max_conversation_memory,
     current_password,
@@ -213,6 +214,7 @@ router.put('/settings', (req, res) => {
   const updates = {};
   if (platform_claude_api_key !== undefined) updates.platform_claude_api_key = platform_claude_api_key;
   if (webhook_base_url !== undefined) updates.webhook_base_url = webhook_base_url;
+  if (client_portal_url !== undefined) updates.client_portal_url = client_portal_url;
   if (fallback_message !== undefined) updates.fallback_message = fallback_message;
   if (max_conversation_memory !== undefined) {
     const n = Number(max_conversation_memory);

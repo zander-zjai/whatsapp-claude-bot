@@ -17,6 +17,7 @@ const leadTagger = require('./leadTagger');
 const pdfGenerator = require('./pdfGenerator');
 const businessHours = require('./businessHours');
 const handover = require('./handover');
+const emailNotifier = require('./emailNotifier');
 
 const URGENT_REPLY = 'Let me connect you with someone.';
 
@@ -145,15 +146,21 @@ function handleWebhook(req, res) {
  * Best-effort: failures are logged but never thrown, so an owner
  * notification can never break the customer-facing reply.
  */
-async function notifyOwner(client, text) {
-  if (!client.owner_phone) return;
+async function notifyOwner(client, text, { email = false, emailSubject } = {}) {
+  if (client.owner_phone) {
+    try {
+      await sendWhatsAppMessage(client, normalizeNumber(client.owner_phone), text);
+    } catch (err) {
+      const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+      logError(`[${client.name}] Failed to notify owner:`, detail);
+      errorLogger.logErrorToFile(`[${client.name}] Failed to notify owner: ${detail}`, err);
+    }
+  }
 
-  try {
-    await sendWhatsAppMessage(client, normalizeNumber(client.owner_phone), text);
-  } catch (err) {
-    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-    logError(`[${client.name}] Failed to notify owner:`, detail);
-    errorLogger.logErrorToFile(`[${client.name}] Failed to notify owner: ${detail}`, err);
+  // Email leg is independent of the WhatsApp send above — if Robin's 24h
+  // WhatsApp window is closed, the email should still go through.
+  if (email) {
+    await emailNotifier.sendOwnerEmail(client, emailSubject || `${client.name} — ZJAI notification`, text);
   }
 }
 
@@ -229,29 +236,32 @@ function buildUrgentNotification(client, from, text, conv) {
   );
 }
 
-/** WhatsApp notification sent to the owner when Zara collects a full quote request. */
-function buildQuoteNotification(quote, from) {
+function quotesPortalLink() {
+  return `${settingsManager.getSettings().client_portal_url}/client/quotes`;
+}
+
+/** Owner notification (WhatsApp + email) sent when Zara collects a full quote request. */
+function buildQuoteNotification(quote, from, score) {
   return (
-    `New Quote Request from ${quote.name}:\n` +
-    `- Contact: ${quote.contact_number}\n` +
-    `- Item: ${quote.item_description}\n` +
-    `- Size: ${quote.size}\n` +
-    `- Quantity: ${quote.quantity}\n` +
-    `(WhatsApp: ${from})`
+    `New quote request — ${score.temperature.toUpperCase()} — ${quote.name}, ${quote.contact_number}, ` +
+    `${quote.item_description} (size: ${quote.size}, qty: ${quote.quantity}). (WhatsApp: ${from})\n` +
+    `Approve in portal: ${quotesPortalLink()}`
   );
 }
 
-/** WhatsApp notification sent to the owner when a Tier 2 PDF quote is ready for review. */
-function buildPdfQuoteNotification(record) {
+/** Owner notification (WhatsApp + email) sent when a Tier 2 PDF quote is ready for review. */
+function buildPdfQuoteNotification(record, score) {
   if (record.status === 'needs_pricing') {
     return (
-      `Quote request for ${record.name} (${record.item_description || 'their request'}) didn't match anything ` +
-      `on your price list — no PDF was generated. Please price it manually and follow up with them directly.`
+      `New quote request — ${score.temperature.toUpperCase()} — ${record.name}, ${record.contact_number}, ` +
+      `${record.item_description || 'their request'} — didn't match anything on your price list, no PDF generated. ` +
+      `Please price it manually and follow up directly. View in portal: ${quotesPortalLink()}`
     );
   }
   return (
-    `New quote ready for approval — R${Number(record.total).toFixed(2)} for ${record.name}. ` +
-    `Reply #approve to send or #reject to decline.`
+    `New quote request — ${score.temperature.toUpperCase()} — ${record.name}, ${record.contact_number}, ` +
+    `${record.item_description}, ${pdfGenerator.formatCurrency(record.total)}. ` +
+    `Approve in portal: ${quotesPortalLink()}`
   );
 }
 
@@ -266,7 +276,7 @@ function buildPdfQuoteNotification(record) {
  * zero-rand quote can never be one-click approved and sent to a customer.
  * No PDF is generated for it either, since there's nothing real to show.
  */
-async function handleTier2Quote(client, from, quote, { items, total }) {
+async function handleTier2Quote(client, from, quote, { items, total }, score) {
   const needsPricing = total <= 0;
 
   const record = quoteManager.addPdfQuote({
@@ -293,7 +303,10 @@ async function handleTier2Quote(client, from, quote, { items, total }) {
     }
   }
 
-  await notifyOwner(client, buildPdfQuoteNotification(record));
+  await notifyOwner(client, buildPdfQuoteNotification(record, score), {
+    email: true,
+    emailSubject: `New quote request — ${score.temperature.toUpperCase()}`,
+  });
 }
 
 /**
@@ -471,12 +484,28 @@ async function processMessage({ from, phoneNumberId, text }) {
   if (quote && quoteManager.hasRecentDuplicateQuote(client.id, from, quote.item_description)) {
     log(`[${client.name}] Skipped duplicate quote request from ${maskPhone(from)} for "${quote.item_description}"`);
   } else if (quote) {
-    let total = 0;
+    const isPdf = quoteManager.isPdfQuoteEnabled(client);
+    const calc = isPdf
+      ? quoteManager.calculateQuoteTotal(client.price_list, quote.line_items)
+      : { items: [], total: 0 };
 
-    if (quoteManager.isPdfQuoteEnabled(client)) {
-      const calc = quoteManager.calculateQuoteTotal(client.price_list, quote.line_items);
-      total = calc.total;
-      await handleTier2Quote(client, from, quote, calc);
+    const isRepeatCustomer = quoteManager
+      .getQuotesForClient(client.id)
+      .some((q) => q.customer_number === from && ['sent', 'won'].includes(q.status));
+
+    // Lead tier is computed up front, at quote-extraction time, so it can
+    // ride along in the owner notification text below.
+    const score = leadTagger.scoreQuote({
+      total: calc.total,
+      size: quote.size,
+      quantity: quote.quantity,
+      itemDescription: quote.item_description,
+      isRepeatCustomer,
+    });
+    conversationManager.setLeadTag(client.id, from, score);
+
+    if (isPdf) {
+      await handleTier2Quote(client, from, quote, calc, score);
     } else {
       quoteManager.addQuote({
         client_id: client.id,
@@ -484,21 +513,11 @@ async function processMessage({ from, phoneNumberId, text }) {
         customer_number: from,
         ...quote,
       });
-      await notifyOwner(client, buildQuoteNotification(quote, from));
+      await notifyOwner(client, buildQuoteNotification(quote, from, score), {
+        email: true,
+        emailSubject: `New quote request — ${score.temperature.toUpperCase()}`,
+      });
     }
-
-    const isRepeatCustomer = quoteManager
-      .getQuotesForClient(client.id)
-      .some((q) => q.customer_number === from && ['sent', 'won'].includes(q.status));
-
-    const score = leadTagger.scoreQuote({
-      total,
-      size: quote.size,
-      quantity: quote.quantity,
-      itemDescription: quote.item_description,
-      isRepeatCustomer,
-    });
-    conversationManager.setLeadTag(client.id, from, score);
   }
 
   logsManager.addLog({

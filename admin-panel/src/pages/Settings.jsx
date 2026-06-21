@@ -18,6 +18,7 @@ export default function Settings() {
 
   const [platformKey, setPlatformKey] = useState('');
   const [webhookBaseUrl, setWebhookBaseUrl] = useState('');
+  const [clientPortalUrl, setClientPortalUrl] = useState('');
   const [fallbackMessage, setFallbackMessage] = useState('');
   const [maxMemory, setMaxMemory] = useState(10);
 
@@ -32,6 +33,7 @@ export default function Settings() {
         if (cancelled) return;
         setPlatformKey(s.platform_claude_api_key || '');
         setWebhookBaseUrl(s.webhook_base_url || '');
+        setClientPortalUrl(s.client_portal_url || '');
         setFallbackMessage(s.fallback_message || '');
         setMaxMemory(s.max_conversation_memory || 10);
       })
@@ -61,6 +63,7 @@ export default function Settings() {
       const payload = {
         platform_claude_api_key: platformKey,
         webhook_base_url: webhookBaseUrl,
+        client_portal_url: clientPortalUrl,
         fallback_message: fallbackMessage,
         max_conversation_memory: Number(maxMemory),
       };
@@ -124,6 +127,20 @@ export default function Settings() {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Used to generate the webhook URL shown after adding a client.
+                </p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Client Portal URL</label>
+                <input
+                  type="text"
+                  value={clientPortalUrl}
+                  onChange={(e) => setClientPortalUrl(e.target.value)}
+                  placeholder="https://zjai-admin.vercel.app"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Used to build the "Approve in portal" link in quote request notifications.
                 </p>
               </div>
 
