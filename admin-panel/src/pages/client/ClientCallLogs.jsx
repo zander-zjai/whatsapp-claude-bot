@@ -19,10 +19,13 @@ const LEAD_CLASSES = {
   cold: 'bg-gray-100 text-gray-500',
 };
 
-function LeadBadge({ tag }) {
+function LeadBadge({ tag, reason }) {
   if (!tag) return <span className="text-xs text-gray-400">—</span>;
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${LEAD_CLASSES[tag] || LEAD_CLASSES.cold}`}>
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${LEAD_CLASSES[tag] || LEAD_CLASSES.cold}`}
+      title={reason || ''}
+    >
       {tag}
     </span>
   );
@@ -107,7 +110,7 @@ export default function ClientCallLogs() {
                     <EndedBadge reason={call.ended_reason} />
                   </td>
                   <td className="px-4 py-3">
-                    <LeadBadge tag={call.lead_tag} />
+                    <LeadBadge tag={call.lead_tag} reason={call.lead_reason} />
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {expanded === call.id ? (

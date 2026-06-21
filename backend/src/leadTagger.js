@@ -18,6 +18,11 @@
 // Full contact info isn't scored separately: the quote-collection flow
 // already requires name + contact number + specifics before a [[QUOTE_
 // REQUEST]] marker is ever emitted, so it's a precondition, not a signal.
+//
+// scoreLead() is the shared tiering core — the JARVIS call-log service
+// (zjai-vapi-webhook, a separate deployed repo) ports this same function
+// verbatim as lib/leadScorer.js so a WhatsApp lead and a phone-call lead
+// are judged by identical hot/warm/cold rules. Keep both in sync.
 // ------------------------------------------------------------------
 
 const HOT_TOTAL_THRESHOLD = 5000;
@@ -33,21 +38,17 @@ const DATE_REGEX =
 const SPECIFIC_REGEX = /\d/;
 
 /**
- * Score a captured quote request into a hot/warm/cold lead temperature.
+ * Core tiering logic, shared (in spirit — ported, not imported, since the
+ * call-log service is a separate deployed repo) with JARVIS's leadScorer.
  *
  * @param {object} params
- * @param {number} [params.total] - Calculated quote total (Tier 2 only; 0/undefined for Tier 1).
- * @param {string} [params.size] - The size/specs field from the quote request.
- * @param {string} [params.quantity] - The quantity field from the quote request.
- * @param {string} [params.itemDescription] - What they're asking for.
- * @param {boolean} [params.isRepeatCustomer] - Has a prior quote that was sent/won for this number.
+ * @param {number} [params.total] - Quote/order total in Rand, 0 if none.
+ * @param {boolean} [params.hasDate] - A verifiable date/deadline was given.
+ * @param {boolean} [params.isSpecific] - An exact size/quantity was given.
+ * @param {boolean} [params.isRepeatCustomer] - Prior quote that was sent/won.
  * @returns {{ temperature: 'hot'|'warm'|'cold', reason: string }}
  */
-function scoreQuote({ total = 0, size = '', quantity = '', itemDescription = '', isRepeatCustomer = false }) {
-  const combinedText = `${size} ${quantity} ${itemDescription}`;
-  const hasDate = DATE_REGEX.test(combinedText);
-  const isSpecific = SPECIFIC_REGEX.test(size) || SPECIFIC_REGEX.test(quantity);
-
+function scoreLead({ total = 0, hasDate = false, isSpecific = false, isRepeatCustomer = false }) {
   const reasons = [];
   let temperature;
 
@@ -75,4 +76,24 @@ function scoreQuote({ total = 0, size = '', quantity = '', itemDescription = '',
   return { temperature, reason: reasons.join(' + ') };
 }
 
-module.exports = { scoreQuote, HOT_TOTAL_THRESHOLD };
+/**
+ * WhatsApp-side wrapper: derives hasDate/isSpecific from the quote's raw
+ * text fields via regex, then runs the shared scoreLead() tiering.
+ *
+ * @param {object} params
+ * @param {number} [params.total] - Calculated quote total (Tier 2 only; 0/undefined for Tier 1).
+ * @param {string} [params.size] - The size/specs field from the quote request.
+ * @param {string} [params.quantity] - The quantity field from the quote request.
+ * @param {string} [params.itemDescription] - What they're asking for.
+ * @param {boolean} [params.isRepeatCustomer] - Has a prior quote that was sent/won for this number.
+ * @returns {{ temperature: 'hot'|'warm'|'cold', reason: string }}
+ */
+function scoreQuote({ total = 0, size = '', quantity = '', itemDescription = '', isRepeatCustomer = false }) {
+  const combinedText = `${size} ${quantity} ${itemDescription}`;
+  const hasDate = DATE_REGEX.test(combinedText);
+  const isSpecific = SPECIFIC_REGEX.test(size) || SPECIFIC_REGEX.test(quantity);
+
+  return scoreLead({ total, hasDate, isSpecific, isRepeatCustomer });
+}
+
+module.exports = { scoreQuote, scoreLead, HOT_TOTAL_THRESHOLD };
