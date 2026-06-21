@@ -254,9 +254,7 @@ function buildPdfQuoteNotification(record) {
  * the branded PDF, store it as a pending quote, and notify the owner for
  * approval. The PDF is NOT sent to the customer yet.
  */
-async function handleTier2Quote(client, from, quote) {
-  const { items, total } = quoteManager.calculateQuoteTotal(client.price_list, quote.line_items);
-
+async function handleTier2Quote(client, from, quote, { items, total }) {
   const record = quoteManager.addPdfQuote({
     client_id: client.id,
     client_name: client.name,
@@ -436,15 +434,10 @@ async function processMessage({ from, phoneNumberId, text }) {
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);
+    reply = extracted.text;
     quote = extracted.quote;
 
-    const tagged = leadTagger.extractLeadTag(extracted.text);
-    reply = tagged.text;
-    if (tagged.tag) {
-      conversationManager.setLeadTag(client.id, from, tagged.tag);
-    }
-
-    // Persist the cleaned reply (markers stripped) so it's part of the
+    // Persist the cleaned reply (marker stripped) so it's part of the
     // next turn's context.
     memory.addMessage(client.id, from, 'assistant', reply);
   } catch (err) {
@@ -458,8 +451,12 @@ async function processMessage({ from, phoneNumberId, text }) {
   if (!sent) status = 'failed';
 
   if (quote) {
+    let total = 0;
+
     if (quoteManager.isPdfQuoteEnabled(client)) {
-      await handleTier2Quote(client, from, quote);
+      const calc = quoteManager.calculateQuoteTotal(client.price_list, quote.line_items);
+      total = calc.total;
+      await handleTier2Quote(client, from, quote, calc);
     } else {
       quoteManager.addQuote({
         client_id: client.id,
@@ -469,6 +466,19 @@ async function processMessage({ from, phoneNumberId, text }) {
       });
       await notifyOwner(client, buildQuoteNotification(quote, from));
     }
+
+    const isRepeatCustomer = quoteManager
+      .getQuotesForClient(client.id)
+      .some((q) => q.customer_number === from && ['sent', 'won'].includes(q.status));
+
+    const score = leadTagger.scoreQuote({
+      total,
+      size: quote.size,
+      quantity: quote.quantity,
+      itemDescription: quote.item_description,
+      isRepeatCustomer,
+    });
+    conversationManager.setLeadTag(client.id, from, score);
   }
 
   logsManager.addLog({
