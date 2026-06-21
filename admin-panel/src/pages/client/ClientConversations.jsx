@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -63,8 +63,20 @@ function sortByPriority(conversations) {
   });
 }
 
+const PRIORITY_TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' },
+  { key: 'none', label: 'None' },
+];
+
 export default function ClientConversations() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('priority') || 'all';
+  const leadFilter = searchParams.get('lead');
   const [conversations, setConversations] = useState([]);
+  const [tab, setTab] = useState(PRIORITY_TABS.some((t) => t.key === initialTab) ? initialTab : 'all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -114,9 +126,59 @@ export default function ClientConversations() {
     }
   }
 
+  function selectTab(key) {
+    setTab(key);
+    setSearchParams(key === 'all' ? {} : { priority: key });
+  }
+
+  const filtered = conversations
+    .filter((c) => {
+      if (tab === 'all') return true;
+      if (tab === 'none') return !c.priority;
+      return c.priority === tab;
+    })
+    .filter((c) => !leadFilter || c.lead_temperature === leadFilter);
+  const counts = conversations.reduce((acc, c) => {
+    const key = c.priority || 'none';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <ClientLayout title="Conversations">
-      <p className="mb-4 text-sm text-cream-dim">{conversations.length} conversation(s)</p>
+      <div className="mb-4 flex gap-2">
+        {PRIORITY_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => selectTab(t.key)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t.key ? 'bg-primary text-ink' : 'border border-line text-cream-dim hover:bg-panel-2'
+            }`}
+          >
+            {t.label} ({t.key === 'all' ? conversations.length : counts[t.key] || 0})
+          </button>
+        ))}
+      </div>
+
+      {leadFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+          Showing {leadFilter} leads only.
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('lead');
+              setSearchParams(next);
+            }}
+            className="font-medium underline underline-offset-2"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      <p className="mb-4 text-sm text-cream-dim">{filtered.length} conversation(s)</p>
 
       {actionError && (
         <div className="mb-4">
@@ -142,14 +204,14 @@ export default function ClientConversations() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {conversations.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-cream-dim">
-                    No conversations yet.
+                    No {tab === 'all' ? '' : `${tab} priority `}conversations.
                   </td>
                 </tr>
               )}
-              {sortByPriority(conversations).map((conv) => {
+              {sortByPriority(filtered).map((conv) => {
                 const status = conversationStatus(conv);
                 return (
                   <tr key={conv.customer_number} className="hover:bg-panel-2">

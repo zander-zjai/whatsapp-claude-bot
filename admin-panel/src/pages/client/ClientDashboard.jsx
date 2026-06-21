@@ -56,9 +56,19 @@ function ActiveServiceCard({ pkg }) {
   );
 }
 
+function LinkedStatsCard({ to, ...props }) {
+  return (
+    <Link to={to} className="block transition-transform hover:-translate-y-0.5">
+      <StatsCard {...props} />
+    </Link>
+  );
+}
+
 export default function ClientDashboard() {
   const [client, setClient] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [pendingQuotes, setPendingQuotes] = useState([]);
+  const [hotLeads, setHotLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -73,6 +83,8 @@ export default function ClientDashboard() {
         if (cancelled) return;
         setClient(data.client);
         setSummary(data.summary);
+        setPendingQuotes(data.pending_quotes || []);
+        setHotLeads(data.hot_leads || []);
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err, 'Failed to load dashboard'));
       } finally {
@@ -99,14 +111,89 @@ export default function ClientDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatsCard label="Messages Today" value={summary.messages_today} icon="💬" />
-            <StatsCard
+            <LinkedStatsCard to="/client/conversations" label="Messages Today" value={summary.messages_today} icon="💬" />
+            <LinkedStatsCard
+              to="/client/conversations"
               label="Messages This Month"
               value={`${summary.messages_this_month} / ${summary.monthly_message_limit}`}
               icon="📈"
             />
-            <StatsCard label="Active Conversations" value={summary.active_conversations} icon="🗒️" />
-            <StatsCard label="Pending Quotes" value={summary.pending_quotes} icon="📋" />
+            <LinkedStatsCard
+              to="/client/conversations"
+              label="Active Conversations"
+              value={summary.active_conversations}
+              icon="🗒️"
+            />
+            <LinkedStatsCard to="/client/quotes" label="Pending Quotes" value={summary.pending_quotes} icon="📋" />
+            <LinkedStatsCard
+              to="/client/conversations?lead=hot"
+              label="Hot Leads"
+              value={summary.hot_leads}
+              icon="🔥"
+            />
+            <LinkedStatsCard
+              to="/client/quotes?tab=won"
+              label="Won This Month"
+              value={summary.won_quotes_this_month}
+              icon="🏆"
+            />
+            <LinkedStatsCard to="/client/calls" label="Calls Today" value={summary.calls_today} icon="📞" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-cream-dim uppercase tracking-wide">Needs Approval</h3>
+                <Link to="/client/quotes" className="text-xs font-medium text-primary hover:underline">
+                  View all →
+                </Link>
+              </div>
+              {pendingQuotes.length === 0 ? (
+                <p className="text-sm text-cream-dim">Nothing pending — you're all caught up.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pendingQuotes.map((q) => (
+                    <li key={q.id}>
+                      <Link
+                        to="/client/quotes"
+                        className="flex items-center justify-between rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm hover:border-primary"
+                      >
+                        <span className="text-cream">
+                          {q.name} — {q.item_description}
+                        </span>
+                        <span className="text-cream-dim">{q.tier === 2 ? `R${Number(q.total || 0).toFixed(2)}` : '—'}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-cream-dim uppercase tracking-wide">Hot Leads</h3>
+                <Link to="/client/conversations" className="text-xs font-medium text-primary hover:underline">
+                  View all →
+                </Link>
+              </div>
+              {hotLeads.length === 0 ? (
+                <p className="text-sm text-cream-dim">No hot leads right now.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {hotLeads.map((c) => (
+                    <li key={c.customer_number}>
+                      <Link
+                        to={`/client/conversations/${encodeURIComponent(c.customer_number)}`}
+                        className="block rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm hover:border-primary"
+                      >
+                        <p className="text-cream">{c.customer_name || c.customer_number}</p>
+                        <p className="truncate text-xs text-cream-dim">{c.lead_reason || c.last_message_preview}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           {client?.service_package && SERVICE_INFO[client.service_package] && (

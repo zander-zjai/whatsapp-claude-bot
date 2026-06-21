@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -32,8 +33,10 @@ function tabForStatus(status) {
 }
 
 export default function ClientQuotes() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'open';
   const [quotes, setQuotes] = useState([]);
-  const [tab, setTab] = useState('open');
+  const [tab, setTab] = useState(TABS.some((t) => t.key === initialTab) ? initialTab : 'open');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -145,7 +148,10 @@ export default function ClientQuotes() {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setSearchParams(t.key === 'open' ? {} : { tab: t.key });
+            }}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.key ? 'bg-primary text-ink' : 'border border-line text-cream-dim hover:bg-panel-2'
             }`}

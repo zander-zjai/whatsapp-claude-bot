@@ -52,10 +52,41 @@ router.use(clientAuth.requireClientAuth);
 // ------------------------------------------------------------------
 
 /** GET /client/me — own client info + summary stats for the dashboard. */
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const client = req.client;
   const conversations = conversationManager.getConversationsForClient(client.id);
   const quotes = quoteManager.getQuotesForClient(client.id, { limit: 1000 });
+
+  const now = new Date();
+  const isThisMonth = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+  };
+
+  const pendingQuotes = quotes.filter((q) => q.status === 'pending');
+  const hotConversations = conversations.filter((c) => c.lead_temperature === 'hot');
+  const wonQuotesThisMonth = quotes.filter((q) => q.status === 'won' && isThisMonth(q.updated_at));
+
+  let callsToday = 0;
+  const jarvisUrl = process.env.JARVIS_URL;
+  const callsApiKey = process.env.CALLS_API_KEY;
+  if (jarvisUrl && callsApiKey) {
+    try {
+      const upstream = await fetch(`${jarvisUrl}/calls?client_id=${encodeURIComponent(client.id)}`, {
+        headers: { Authorization: `Bearer ${callsApiKey}` },
+      });
+      if (upstream.ok) {
+        const data = await upstream.json();
+        const calls = data.calls || [];
+        const todayStr = now.toISOString().slice(0, 10);
+        callsToday = calls.filter((c) => (c.timestamp || '').slice(0, 10) === todayStr).length;
+      }
+    } catch (err) {
+      // Calls dashboard stat is best-effort -- JARVIS being unreachable
+      // shouldn't break the rest of the dashboard.
+    }
+  }
 
   res.json({
     client: clientManager.sanitizeClientForPortal(client),
@@ -64,8 +95,24 @@ router.get('/me', (req, res) => {
       messages_this_month: logsManager.getMonthlyMessageCountForClient(client.id),
       monthly_message_limit: client.monthly_message_limit,
       active_conversations: conversations.length,
-      pending_quotes: quotes.filter((q) => q.status === 'pending').length,
+      pending_quotes: pendingQuotes.length,
+      hot_leads: hotConversations.length,
+      won_quotes_this_month: wonQuotesThisMonth.length,
+      calls_today: callsToday,
     },
+    pending_quotes: pendingQuotes.slice(0, 5).map((q) => ({
+      id: q.id,
+      name: q.name,
+      item_description: q.item_description,
+      total: q.total,
+      tier: q.tier,
+    })),
+    hot_leads: hotConversations.slice(0, 5).map((c) => ({
+      customer_number: c.customer_number,
+      customer_name: c.customer_name,
+      last_message_preview: c.last_message_preview,
+      lead_reason: c.lead_reason,
+    })),
   });
 });
 
