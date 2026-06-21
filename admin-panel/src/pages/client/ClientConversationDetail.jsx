@@ -28,13 +28,13 @@ const STATUS_CLASSES = {
 const LEAD_CLASSES = {
   hot: 'bg-red-100 text-red-700',
   warm: 'bg-orange-100 text-orange-700',
-  cold: 'bg-gray-100 text-gray-500',
+  cold: 'bg-panel-2 text-cream-dim',
 };
 
 const PRIORITY_CLASSES = {
   high: 'bg-red-100 text-red-700',
   medium: 'bg-orange-100 text-orange-700',
-  low: 'bg-gray-100 text-gray-500',
+  low: 'bg-panel-2 text-cream-dim',
 };
 
 // Bold + highlight Rand amounts (e.g. "R5,400.00") so prices jump out when
@@ -45,7 +45,7 @@ function highlightAmounts(text) {
   const parts = String(text || '').split(AMOUNT_REGEX);
   return parts.map((part, i) =>
     AMOUNT_REGEX.test(part) ? (
-      <strong key={i} className="text-green-700">
+      <strong key={i} className="text-green-400">
         {part}
       </strong>
     ) : (
@@ -61,9 +61,9 @@ function MessageBubble({ msg }) {
     <div className="space-y-1">
       {msg.customer_message && (
         <div className="flex justify-start">
-          <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-800">
+          <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-panel-2 px-4 py-2 text-sm text-cream">
             <p className="whitespace-pre-wrap">{highlightAmounts(msg.customer_message)}</p>
-            <p className="mt-1 text-[11px] text-gray-400">{formatDateTime(msg.timestamp)}</p>
+            <p className="mt-1 text-[11px] text-grey">{formatDateTime(msg.timestamp)}</p>
           </div>
         </div>
       )}
@@ -72,7 +72,7 @@ function MessageBubble({ msg }) {
         <div className="flex justify-end">
           <div
             className={`max-w-[75%] rounded-2xl rounded-br-sm px-4 py-2 text-sm ${
-              isFailed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary/10 text-gray-900'
+              isFailed ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'bg-primary/10 text-cream'
             }`}
           >
             <p className="whitespace-pre-wrap">{highlightAmounts(msg.bot_reply)}</p>
@@ -87,7 +87,7 @@ function MessageBubble({ msg }) {
                   handover
                 </span>
               )}
-              <p className="text-[11px] text-gray-400">{formatDateTime(msg.timestamp)}</p>
+              <p className="text-[11px] text-grey">{formatDateTime(msg.timestamp)}</p>
             </div>
           </div>
         </div>
@@ -157,13 +157,13 @@ export default function ClientConversationDetail() {
 
       {!loading && !error && conversation && (
         <>
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-line bg-panel p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-base font-semibold text-gray-900">
+              <p className="text-base font-semibold text-cream">
                 {conversation.customer_name || 'Unknown customer'}
               </p>
-              <p className="font-mono text-xs text-gray-500">{maskPhoneNumber(conversation.customer_number)}</p>
-              <p className="mt-1 text-xs text-gray-500">Last active: {formatDateTime(conversation.last_message_at)}</p>
+              <p className="font-mono text-xs text-cream-dim">{maskPhoneNumber(conversation.customer_number)}</p>
+              <p className="mt-1 text-xs text-cream-dim">Last active: {formatDateTime(conversation.last_message_at)}</p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {conversation.lead_temperature && (
@@ -195,7 +195,7 @@ export default function ClientConversationDetail() {
                 type="button"
                 onClick={handleToggleHandover}
                 disabled={pending}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-60"
               >
                 {conversation.handover_active ? 'Release to Zara' : 'Take Over'}
               </button>
@@ -208,9 +208,9 @@ export default function ClientConversationDetail() {
             </div>
           )}
 
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-line bg-panel p-4 shadow-sm">
             {messages.length === 0 ? (
-              <p className="py-10 text-center text-gray-500">No messages yet.</p>
+              <p className="py-10 text-center text-cream-dim">No messages yet.</p>
             ) : (
               <div className="space-y-4">
                 {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}

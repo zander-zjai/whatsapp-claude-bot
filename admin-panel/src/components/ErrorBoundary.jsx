@@ -21,16 +21,16 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 px-4 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Something went wrong</h1>
-          <p className="max-w-sm text-sm text-gray-500">
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-panel-2 px-4 text-center">
+          <h1 className="text-xl font-semibold text-cream">Something went wrong</h1>
+          <p className="max-w-sm text-sm text-cream-dim">
             The admin panel hit an unexpected error. Try reloading the page — if
             the problem continues, contact ZJAI Technologies support.
           </p>
           <button
             type="button"
             onClick={this.handleReload}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-ink hover:bg-primary-600"
           >
             Reload page
           </button>

@@ -36,9 +36,9 @@ function ActiveServiceCard({ pkg }) {
   const info = SERVICE_INFO[pkg];
   if (!info) return null;
   const colorMap = {
-    purple: 'bg-purple-50 border-purple-200 text-purple-800',
-    green: 'bg-green-50 border-green-200 text-green-800',
-    blue: 'bg-blue-50 border-blue-200 text-blue-800',
+    purple: 'bg-primary/10 border-primary/30 text-primary',
+    green: 'bg-green-500/10 border-green-500/30 text-green-400',
+    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
   };
   return (
     <div className={`flex items-start gap-4 rounded-lg border p-4 ${colorMap[info.color] || colorMap.purple}`}>
@@ -94,8 +94,8 @@ export default function ClientDashboard() {
       {!loading && !error && summary && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Welcome back, {client?.contact_person || client?.name}</h2>
-            <p className="text-sm text-gray-500">Here's an overview of your Zara services.</p>
+            <h2 className="text-lg font-semibold text-cream">Welcome back, {client?.contact_person || client?.name}</h2>
+            <p className="text-sm text-cream-dim">Here's an overview of your Zara services.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,8 +110,8 @@ export default function ClientDashboard() {
           </div>
 
           {client?.service_package && SERVICE_INFO[client.service_package] && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">Your Active Plan</h3>
+            <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-cream-dim uppercase tracking-wide">Your Active Plan</h3>
               <ActiveServiceCard pkg={client.service_package} />
             </div>
           )}

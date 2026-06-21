@@ -16,11 +16,11 @@ function formatDateTime(iso) {
 const LEAD_CLASSES = {
   hot: 'bg-red-100 text-red-700',
   warm: 'bg-orange-100 text-orange-700',
-  cold: 'bg-gray-100 text-gray-500',
+  cold: 'bg-panel-2 text-cream-dim',
 };
 
 function LeadBadge({ tag, reason }) {
-  if (!tag) return <span className="text-xs text-gray-400">—</span>;
+  if (!tag) return <span className="text-xs text-grey">—</span>;
   return (
     <span
       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${LEAD_CLASSES[tag] || LEAD_CLASSES.cold}`}
@@ -39,7 +39,7 @@ function EndedBadge({ reason }) {
     ? 'bg-blue-100 text-blue-700'
     : isAssistant
     ? 'bg-orange-100 text-orange-700'
-    : 'bg-gray-100 text-gray-600';
+    : 'bg-panel-2 text-cream-dim';
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
       {reason || 'Unknown'}
@@ -67,14 +67,14 @@ export default function ClientCallLogs() {
   return (
     <ClientLayout title="Call Logs">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">{calls.length} call(s) on record</p>
+        <p className="text-sm text-cream-dim">{calls.length} call(s) on record</p>
       </div>
 
       {loading && <LoadingSpinner label="Loading call logs…" />}
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && calls.length === 0 && (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center text-gray-500">
+        <div className="rounded-xl border border-dashed border-line bg-panel py-16 text-center text-cream-dim">
           <p className="text-lg">📞</p>
           <p className="mt-2 font-medium">No calls yet</p>
           <p className="mt-1 text-sm">
@@ -84,35 +84,35 @@ export default function ClientCallLogs() {
       )}
 
       {!loading && !error && calls.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-panel-2">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Date &amp; Time</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Caller</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Ended</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Summary</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Date &amp; Time</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Caller</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Ended</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Lead</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Summary</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {calls.map((call) => (
                 <tr
                   key={call.id}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-panel-2 cursor-pointer"
                   onClick={() => setExpanded(expanded === call.id ? null : call.id)}
                 >
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                  <td className="px-4 py-3 text-cream-dim whitespace-nowrap">
                     {formatDateTime(call.timestamp)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{call.caller || 'Unknown'}</td>
+                  <td className="px-4 py-3 font-medium text-cream">{call.caller || 'Unknown'}</td>
                   <td className="px-4 py-3">
                     <EndedBadge reason={call.ended_reason} />
                   </td>
                   <td className="px-4 py-3">
                     <LeadBadge tag={call.lead_tag} reason={call.lead_reason} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-cream-dim">
                     {expanded === call.id ? (
                       <span className="whitespace-pre-wrap">{call.summary}</span>
                     ) : (

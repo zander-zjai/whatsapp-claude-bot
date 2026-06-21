@@ -27,11 +27,11 @@ const STATUS_CLASSES = {
 const LEAD_CLASSES = {
   hot: 'bg-red-100 text-red-700',
   warm: 'bg-orange-100 text-orange-700',
-  cold: 'bg-gray-100 text-gray-500',
+  cold: 'bg-panel-2 text-cream-dim',
 };
 
 function LeadBadge({ temperature, reason }) {
-  if (!temperature) return <span className="text-xs text-gray-400">—</span>;
+  if (!temperature) return <span className="text-xs text-grey">—</span>;
   return (
     <span
       className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${LEAD_CLASSES[temperature]}`}
@@ -45,11 +45,11 @@ function LeadBadge({ temperature, reason }) {
 const PRIORITY_CLASSES = {
   high: 'bg-red-100 text-red-700',
   medium: 'bg-orange-100 text-orange-700',
-  low: 'bg-gray-100 text-gray-500',
+  low: 'bg-panel-2 text-cream-dim',
 };
 
 function PriorityBadge({ priority }) {
-  if (!priority) return <span className="text-xs text-gray-400">—</span>;
+  if (!priority) return <span className="text-xs text-grey">—</span>;
   return (
     <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${PRIORITY_CLASSES[priority]}`}>
       {priority}
@@ -107,7 +107,7 @@ export default function Conversations() {
 
   return (
     <Layout title="Conversations">
-      <p className="mb-4 text-sm text-gray-500">{conversations.length} conversation(s)</p>
+      <p className="mb-4 text-sm text-cream-dim">{conversations.length} conversation(s)</p>
 
       {actionError && (
         <div className="mb-4">
@@ -119,24 +119,24 @@ export default function Conversations() {
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-panel-2">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Message</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Active</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Priority</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Client</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Customer</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Last Message</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Last Active</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Priority</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Lead</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {conversations.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-cream-dim">
                     No conversations yet.
                   </td>
                 </tr>
@@ -145,19 +145,19 @@ export default function Conversations() {
                 const status = conversationStatus(conv);
                 const key = conversationKey(conv);
                 return (
-                  <tr key={key} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-800">
+                  <tr key={key} className="hover:bg-panel-2">
+                    <td className="whitespace-nowrap px-4 py-3 text-cream">
                       {clientNames[conv.client_id] || conv.client_id}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cream-dim">
                       {conv.customer_name
                         ? `${conv.customer_name} (${maskPhoneNumber(conv.customer_number)})`
                         : maskPhoneNumber(conv.customer_number)}
                     </td>
-                    <td className="px-4 py-3 text-gray-800" title={conv.last_message_preview}>
+                    <td className="px-4 py-3 text-cream" title={conv.last_message_preview}>
                       {truncate(conv.last_message_preview, 50)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                    <td className="whitespace-nowrap px-4 py-3 text-cream-dim">
                       {formatDateTime(conv.last_message_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -176,7 +176,7 @@ export default function Conversations() {
                         type="button"
                         onClick={() => handleToggleHandover(conv)}
                         disabled={pendingKey === key}
-                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                        className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-60"
                       >
                         {conv.handover_active ? 'Release to Zara' : 'Take Over'}
                       </button>

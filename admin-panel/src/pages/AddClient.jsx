@@ -26,20 +26,20 @@ export default function AddClient() {
   if (result) {
     return (
       <Layout title="Add New Client">
-        <div className="mx-auto max-w-xl rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-green-800">
+        <div className="mx-auto max-w-xl rounded-xl border border-green-500/30 bg-green-500/10 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-green-400">
             Client "{result.client.name}" added successfully!
           </h2>
-          <p className="mt-2 text-sm text-green-700">
+          <p className="mt-2 text-sm text-green-400">
             Their webhook URL is:{' '}
-            <code className="rounded bg-white px-2 py-1 font-mono text-xs text-gray-800">
+            <code className="rounded bg-panel px-2 py-1 font-mono text-xs text-cream">
               {result.webhook_url}
             </code>
           </p>
 
           <div className="mt-5 space-y-2 text-sm">
-            <p className="font-medium text-gray-700">Setup checklist</p>
-            <ul className="space-y-1 text-gray-700">
+            <p className="font-medium text-cream-dim">Setup checklist</p>
+            <ul className="space-y-1 text-cream-dim">
               <li>✅ Client added to system</li>
               <li>✅ Webhook URL generated</li>
               <li>⬜ Connect webhook in Meta Developer Portal</li>
@@ -50,14 +50,14 @@ export default function AddClient() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               to="/clients"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink hover:bg-primary-700"
             >
               Go to Clients
             </Link>
             <button
               type="button"
               onClick={() => setResult(null)}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-line bg-panel px-4 py-2 text-sm font-semibold text-cream-dim hover:bg-panel-2"
             >
               Add another client
             </button>

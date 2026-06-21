@@ -37,8 +37,8 @@ function SetupChecklist({ client, onChange }) {
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-4 text-base font-semibold text-gray-900">Setup Checklist</h2>
+    <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+      <h2 className="mb-4 text-base font-semibold text-cream">Setup Checklist</h2>
       <ErrorMessage message={error} />
       <ul className="space-y-2">
         {CHECKLIST_ITEMS.map((item) => {
@@ -50,9 +50,9 @@ function SetupChecklist({ client, onChange }) {
                 checked={done}
                 disabled={savingKey === item.key}
                 onChange={() => toggle(item.key)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-line"
               />
-              <span className={done ? 'text-gray-700' : 'text-gray-500'}>{item.label}</span>
+              <span className={done ? 'text-cream-dim' : 'text-cream-dim'}>{item.label}</span>
             </li>
           );
         })}

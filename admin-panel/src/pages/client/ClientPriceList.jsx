@@ -6,8 +6,8 @@ import { getClientPriceList, updateClientPriceList } from '../../api/clientPorta
 import { getErrorMessage } from '../../api/client';
 
 const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
+  'w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+const labelClass = 'mb-1 block text-sm font-medium text-cream-dim';
 
 export default function ClientPriceList() {
   const [priceList, setPriceList] = useState([]);
@@ -123,7 +123,7 @@ export default function ClientPriceList() {
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && quoteTier !== 2 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 shadow-sm">
+        <div className="rounded-xl border border-line bg-panel p-5 text-sm text-cream-dim shadow-sm">
           The price list is only available for clients on the Auto PDF Quote (Tier 2) plan. Contact
           ZJAI Technologies to upgrade.
         </div>
@@ -133,15 +133,15 @@ export default function ClientPriceList() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <ErrorMessage message={saveError} />
 
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-gray-900">Price List</h2>
-              <label className="cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <h2 className="text-base font-semibold text-cream">Price List</h2>
+              <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-cream-dim hover:bg-panel-2">
                 Bulk Upload CSV
                 <input type="file" accept=".csv,text/csv" onChange={handleCsvUpload} className="hidden" />
               </label>
             </div>
-            <p className="-mt-2 mb-3 text-xs text-gray-500">
+            <p className="-mt-2 mb-3 text-xs text-cream-dim">
               CSV columns: item, unit, price (header row optional, e.g. "Vinyl Banner,per sqm,150").
               Uploaded rows are added to the list below — review then click Save.
             </p>
@@ -175,7 +175,7 @@ export default function ClientPriceList() {
                   <button
                     type="button"
                     onClick={() => removeItem(index)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 sm:w-auto"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm text-cream-dim hover:bg-panel-2 sm:w-auto"
                   >
                     Remove
                   </button>
@@ -186,13 +186,13 @@ export default function ClientPriceList() {
             <button
               type="button"
               onClick={addItem}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+              className="mt-2 w-full rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-cream-dim hover:bg-panel-2 sm:w-auto"
             >
               + Add Price List Item
             </button>
 
             {priceList.length === 0 && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-cream-dim">
                 Without at least one item, quote requests fall back to manual handling.
               </p>
             )}
@@ -203,7 +203,7 @@ export default function ClientPriceList() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink hover:bg-primary-700 disabled:opacity-60"
             >
               {saving ? 'Saving…' : 'Save Price List'}
             </button>

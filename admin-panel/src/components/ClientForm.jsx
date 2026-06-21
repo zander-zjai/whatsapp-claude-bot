@@ -40,8 +40,8 @@ export const DEFAULT_CLIENT_VALUES = {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
+  'w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+const labelClass = 'mb-1 block text-sm font-medium text-cream-dim';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -121,12 +121,12 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       <ErrorMessage message={error} />
 
       {updatedAt && (
-        <p className="text-xs text-gray-500">Last updated: {formatDateTime(updatedAt)}</p>
+        <p className="text-xs text-cream-dim">Last updated: {formatDateTime(updatedAt)}</p>
       )}
 
       {/* Business info */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Business Information</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Business Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Business Name *</label>
@@ -186,8 +186,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* WhatsApp config */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">WhatsApp Configuration</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">WhatsApp Configuration</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>WhatsApp Phone Number ID *</label>
@@ -217,8 +217,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Claude config */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Claude Configuration</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Claude Configuration</h2>
 
         <label className="mb-3 flex items-center gap-3">
           <button
@@ -229,7 +229,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           >
             <span />
           </button>
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-cream-dim">
             Use platform Claude API key (configured in Settings) instead of a client-specific key
           </span>
         </label>
@@ -251,8 +251,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Bot personality */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Bot Personality</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Bot Personality</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Bot Personality</label>
@@ -299,15 +299,15 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             placeholder={promptPlaceholder}
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-cream-dim">
             Tip: include an instruction like "Always reply in the same language the customer uses."
           </p>
         </div>
       </section>
 
       {/* Owner & handover */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Owner & Handover</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Owner & Handover</h2>
         <div>
           <label className={labelClass}>Owner WhatsApp Number</label>
           <input
@@ -318,7 +318,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             placeholder="+27821234567"
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-cream-dim">
             From this number, send <code>#takeover</code> to silence Zara for a conversation and{' '}
             <code>#release</code> to hand it back. Zara also notifies this number when a customer
             asks for a human or after-hours urgent help.
@@ -327,8 +327,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Business hours */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Business Hours</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Business Hours</h2>
 
         <label className="mb-3 flex items-center gap-3">
           <button
@@ -339,7 +339,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           >
             <span />
           </button>
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-cream-dim">
             Restrict Zara's replies to business hours (outside these hours, customers get a
             "we're closed" auto-reply)
           </span>
@@ -387,8 +387,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                     onClick={() => toggleBusinessDay(day)}
                     className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
                       values.business_hours.days.includes(day)
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-300 bg-white text-gray-700'
+                        ? 'border-primary bg-primary text-ink'
+                        : 'border-line bg-panel text-cream-dim'
                     }`}
                   >
                     {label}
@@ -401,8 +401,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Quote requests */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Quote Requests</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Quote Requests</h2>
         <label className="flex items-center gap-3">
           <button
             type="button"
@@ -412,7 +412,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           >
             <span />
           </button>
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-cream-dim">
             When customers ask for a quote, Zara collects their name, contact number, item,
             size, and quantity.
           </span>
@@ -430,7 +430,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                 <option value={1}>Tier 1 — Quote Assist (notify owner, owner quotes manually)</option>
                 <option value={2}>Tier 2 — Auto PDF Quote (generate branded PDF for owner approval)</option>
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-cream-dim">
                 {Number(values.quote_tier) === 2
                   ? 'Zara calculates a total from the price list below and generates a branded PDF. The owner replies #approve or #reject before it\'s sent to the customer.'
                   : 'Zara sends the owner a summary of the request; the owner prepares and sends the final quote manually.'}
@@ -447,7 +447,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                         type="color"
                         value={values.brand_color}
                         onChange={(e) => set('brand_color', e.target.value)}
-                        className="h-10 w-14 rounded border border-gray-300"
+                        className="h-10 w-14 rounded border border-line"
                       />
                       <input
                         type="text"
@@ -500,7 +500,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                         <button
                           type="button"
                           onClick={() => removePriceListItem(index)}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+                          className="rounded-lg border border-line px-3 py-2 text-sm text-cream-dim hover:bg-panel-2"
                         >
                           Remove
                         </button>
@@ -510,12 +510,12 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                   <button
                     type="button"
                     onClick={addPriceListItem}
-                    className="mt-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="mt-2 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-cream-dim hover:bg-panel-2"
                   >
                     + Add Price List Item
                   </button>
                   {values.price_list.length === 0 && (
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-cream-dim">
                       Tier 2 needs at least one price list item — without one, quotes fall back to
                       Tier 1 behaviour.
                     </p>
@@ -531,7 +531,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                     placeholder="This quote is valid for 7 days from the date of issue. Prices are subject to change after the validity period..."
                     className={inputClass}
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-cream-dim">
                     Shown on the generated PDF. Leave blank to use the default terms.
                   </p>
                 </div>
@@ -542,8 +542,8 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Billing */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Billing</h2>
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Billing</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClass}>Monthly Fee (R)</label>
@@ -599,12 +599,12 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       </section>
 
       {/* Status */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
         <label className="flex items-center gap-3">
           <button type="button" className="switch" data-on={values.active} onClick={() => set('active', !values.active)}>
             <span />
           </button>
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-cream-dim">
             Active {values.active ? '(bot will respond to messages)' : '(bot is paused)'}
           </span>
         </label>
@@ -614,7 +614,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+          className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-ink hover:bg-primary-700 disabled:opacity-60"
         >
           {loading ? 'Saving…' : submitLabel}
         </button>

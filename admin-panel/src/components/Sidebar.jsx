@@ -16,19 +16,19 @@ export default function Sidebar({ onNavigate }) {
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-      isActive ? 'bg-primary text-white' : 'text-gray-700 hover:bg-primary-50 hover:text-primary'
+      isActive ? 'bg-primary text-ink' : 'text-cream-dim hover:bg-primary-50 hover:text-primary'
     }`;
 
   return (
     <div className="flex h-full flex-col justify-between p-4">
       <div>
         <div className="mb-6 flex items-center gap-2 px-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-ink">
             Z
           </div>
           <div>
-            <p className="text-sm font-bold leading-tight text-gray-900">ZJAI Technologies</p>
-            <p className="text-xs leading-tight text-gray-500">Admin Panel</p>
+            <p className="text-sm font-bold leading-tight text-cream">ZJAI Technologies</p>
+            <p className="text-xs leading-tight text-cream-dim">Admin Panel</p>
           </div>
         </div>
 
@@ -45,7 +45,7 @@ export default function Sidebar({ onNavigate }) {
       <button
         type="button"
         onClick={logout}
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600"
+        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-cream-dim hover:bg-panel-2 hover:text-red-400"
       >
         <span>🚪</span>
         <span>Logout</span>

@@ -1,8 +1,8 @@
 export default function StatsCard({ label, value, icon, status }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-500">{label}</p>
+        <p className="text-sm font-medium text-cream-dim">{label}</p>
         {icon && <span className="text-xl">{icon}</span>}
       </div>
       <div className="mt-2 flex items-center gap-2">
@@ -13,7 +13,7 @@ export default function StatsCard({ label, value, icon, status }) {
             }`}
           />
         )}
-        <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        <p className="text-2xl font-semibold text-cream">{value}</p>
       </div>
     </div>
   );

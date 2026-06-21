@@ -4,7 +4,7 @@ import { SERVICE_PACKAGES } from '../utils/constants';
 
 function ServiceBadges({ servicePackage }) {
   const pkg = SERVICE_PACKAGES.find((p) => p.value === servicePackage);
-  if (!pkg) return <span className="text-gray-400 text-xs">—</span>;
+  if (!pkg) return <span className="text-grey text-xs">—</span>;
   const features = pkg.features || [];
   return (
     <div className="flex flex-wrap gap-1">
@@ -25,7 +25,7 @@ function ServiceBadges({ servicePackage }) {
 export default function ClientTable({ clients, onToggleActive, onDelete }) {
   if (clients.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center text-gray-500">
+      <div className="rounded-xl border border-dashed border-line bg-panel py-16 text-center text-cream-dim">
         No clients yet.{' '}
         <Link to="/clients/new" className="font-medium text-primary hover:underline">
           Add your first client
@@ -36,24 +36,24 @@ export default function ClientTable({ clients, onToggleActive, onDelete }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+      <table className="min-w-full divide-y divide-line text-sm">
+        <thead className="bg-panel-2">
           <tr>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Services</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Msgs Today</th>
-            <th className="px-4 py-3 text-left font-semibold text-gray-600">Date Added</th>
-            <th className="px-4 py-3 text-right font-semibold text-gray-600">Actions</th>
+            <th className="px-4 py-3 text-left font-semibold text-cream-dim">Client</th>
+            <th className="px-4 py-3 text-left font-semibold text-cream-dim">Services</th>
+            <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
+            <th className="px-4 py-3 text-left font-semibold text-cream-dim">Msgs Today</th>
+            <th className="px-4 py-3 text-left font-semibold text-cream-dim">Date Added</th>
+            <th className="px-4 py-3 text-right font-semibold text-cream-dim">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-line">
           {clients.map((client) => (
-            <tr key={client.id} className="hover:bg-gray-50">
+            <tr key={client.id} className="hover:bg-panel-2">
               <td className="px-4 py-3">
-                <p className="font-medium text-gray-900">{client.name}</p>
-                <p className="text-xs text-gray-400">{client.contact_person}</p>
+                <p className="font-medium text-cream">{client.name}</p>
+                <p className="text-xs text-grey">{client.contact_person}</p>
               </td>
               <td className="px-4 py-3">
                 <ServiceBadges servicePackage={client.service_package} />
@@ -69,8 +69,8 @@ export default function ClientTable({ clients, onToggleActive, onDelete }) {
                   <span />
                 </button>
               </td>
-              <td className="px-4 py-3 text-gray-600">{client.messages_today ?? 0}</td>
-              <td className="px-4 py-3 text-gray-600">{formatDate(client.created_at)}</td>
+              <td className="px-4 py-3 text-cream-dim">{client.messages_today ?? 0}</td>
+              <td className="px-4 py-3 text-cream-dim">{formatDate(client.created_at)}</td>
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-3 whitespace-nowrap">
                   <Link to={`/clients/edit/${client.id}`} className="font-medium text-primary hover:underline">

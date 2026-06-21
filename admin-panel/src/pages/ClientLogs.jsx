@@ -58,33 +58,33 @@ export default function ClientLogs() {
         </Link>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-line bg-panel p-4 shadow-sm sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Search</label>
+          <label className="mb-1 block text-sm font-medium text-cream-dim">Search</label>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Phone number or keyword…"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">From</label>
+          <label className="mb-1 block text-sm font-medium text-cream-dim">From</label>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">To</label>
+          <label className="mb-1 block text-sm font-medium text-cream-dim">To</label>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         {(search || dateFrom || dateTo) && (
@@ -95,7 +95,7 @@ export default function ClientLogs() {
               setDateFrom('');
               setDateTo('');
             }}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-cream-dim hover:bg-panel-2"
           >
             Clear filters
           </button>
@@ -106,39 +106,39 @@ export default function ClientLogs() {
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-panel-2">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Timestamp</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Message</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Reply</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Response Time</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Timestamp</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Customer</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Message</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Reply</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Response Time</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-cream-dim">
                     No messages found.
                   </td>
                 </tr>
               )}
               {logs.map((logEntry) => (
-                <tr key={logEntry.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDateTime(logEntry.timestamp)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">
+                <tr key={logEntry.id} className="hover:bg-panel-2">
+                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(logEntry.timestamp)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cream-dim">
                     {maskPhoneNumber(logEntry.customer_number)}
                   </td>
-                  <td className="px-4 py-3 text-gray-800" title={logEntry.customer_message}>
+                  <td className="px-4 py-3 text-cream" title={logEntry.customer_message}>
                     {truncate(logEntry.customer_message, 50)}
                   </td>
-                  <td className="px-4 py-3 text-gray-800" title={logEntry.bot_reply}>
+                  <td className="px-4 py-3 text-cream" title={logEntry.bot_reply}>
                     {truncate(logEntry.bot_reply, 50)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{logEntry.response_time_ms} ms</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{logEntry.response_time_ms} ms</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-medium ${

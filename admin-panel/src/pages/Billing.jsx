@@ -52,7 +52,7 @@ export default function Billing() {
   return (
     <Layout title="Billing">
       <div className="mb-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-cream-dim">
           {clients.length} client(s) · Total monthly revenue: R{totalMonthly.toFixed(2)}
         </p>
       </div>
@@ -67,24 +67,24 @@ export default function Billing() {
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-panel-2">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Client</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Service Package</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Monthly Fee</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Payment Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Invoice</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Next Invoice</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Client</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Service Package</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Monthly Fee</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Payment Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Last Invoice</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Next Invoice</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {clients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{client.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{servicePackageLabel(client.service_package)}</td>
-                  <td className="px-4 py-3 text-gray-600">R{(Number(client.monthly_fee) || 0).toFixed(2)}</td>
+                <tr key={client.id} className="hover:bg-panel-2">
+                  <td className="px-4 py-3 font-medium text-cream">{client.name}</td>
+                  <td className="px-4 py-3 text-cream-dim">{servicePackageLabel(client.service_package)}</td>
+                  <td className="px-4 py-3 text-cream-dim">R{(Number(client.monthly_fee) || 0).toFixed(2)}</td>
                   <td className="px-4 py-3">
                     <button
                       type="button"
@@ -95,17 +95,17 @@ export default function Billing() {
                     >
                       <span />
                     </button>
-                    <span className="ml-2 align-middle text-xs text-gray-600">
+                    <span className="ml-2 align-middle text-xs text-cream-dim">
                       {client.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{client.last_invoice_date ? formatDate(client.last_invoice_date) : '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{client.next_invoice_date ? formatDate(client.next_invoice_date) : '—'}</td>
+                  <td className="px-4 py-3 text-cream-dim">{client.last_invoice_date ? formatDate(client.last_invoice_date) : '—'}</td>
+                  <td className="px-4 py-3 text-cream-dim">{client.next_invoice_date ? formatDate(client.next_invoice_date) : '—'}</td>
                 </tr>
               ))}
               {clients.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-cream-dim">
                     No clients yet.
                   </td>
                 </tr>

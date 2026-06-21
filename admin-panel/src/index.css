@@ -9,7 +9,13 @@ body,
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-black text-cream font-sans;
+}
+
+h1,
+h2,
+h3 {
+  font-family: 'Fraunces', serif;
 }
 
 /* Simple toggle switch */
@@ -20,7 +26,7 @@ body {
   @apply bg-primary;
 }
 .switch[data-on='false'] {
-  @apply bg-gray-300;
+  @apply bg-line;
 }
 .switch span {
   @apply inline-block h-4 w-4 transform rounded-full bg-white transition-transform;

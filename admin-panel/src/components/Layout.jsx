@@ -6,9 +6,9 @@ export default function Layout({ title, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-black">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-white lg:block">
+      <aside className="hidden w-64 shrink-0 border-r border-line bg-panel lg:block">
         <Sidebar />
       </aside>
 
@@ -16,7 +16,7 @@ export default function Layout({ title, children }) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl">
+          <aside className="absolute left-0 top-0 h-full w-64 bg-panel shadow-xl">
             <Sidebar onNavigate={() => setSidebarOpen(false)} />
           </aside>
         </div>

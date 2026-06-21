@@ -62,8 +62,8 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-cream">
               Messages per day (last 7 days)
             </h2>
             <MessageChart data={stats.chart_data} clients={stats.clients} />

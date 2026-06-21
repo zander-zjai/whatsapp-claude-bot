@@ -6,8 +6,8 @@ import { getSettings, updateSettings } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 
 const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
+  'w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+const labelClass = 'mb-1 block text-sm font-medium text-cream-dim';
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
@@ -92,14 +92,14 @@ export default function Settings() {
       {!loading && !loadError && (
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6">
           {successMsg && (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">
               {successMsg}
             </div>
           )}
           <ErrorMessage message={saveError} />
 
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Platform Defaults</h2>
+          <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-cream">Platform Defaults</h2>
 
             <div className="space-y-4">
               <div>
@@ -111,7 +111,7 @@ export default function Settings() {
                   placeholder="sk-ant-..."
                   className={`${inputClass} font-mono`}
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-cream-dim">
                   Used as the default key for clients with "use platform key" enabled.
                 </p>
               </div>
@@ -125,7 +125,7 @@ export default function Settings() {
                   placeholder="https://yourdomain.com"
                   className={inputClass}
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-cream-dim">
                   Used to generate the webhook URL shown after adding a client.
                 </p>
               </div>
@@ -139,7 +139,7 @@ export default function Settings() {
                   placeholder="https://zjai-admin.vercel.app"
                   className={inputClass}
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-cream-dim">
                   Used to build the "Approve in portal" link in quote request notifications.
                 </p>
               </div>
@@ -152,7 +152,7 @@ export default function Settings() {
                   rows={3}
                   className={inputClass}
                 />
-                <p className="mt-1 text-xs text-gray-500">Sent to customers when Claude fails to respond.</p>
+                <p className="mt-1 text-xs text-cream-dim">Sent to customers when Claude fails to respond.</p>
               </div>
 
               <div>
@@ -168,8 +168,8 @@ export default function Settings() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-900">Change Admin Password</h2>
+          <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-cream">Change Admin Password</h2>
             <div className="space-y-4">
               <div>
                 <label className={labelClass}>Current Password</label>
@@ -201,7 +201,7 @@ export default function Settings() {
                   autoComplete="new-password"
                 />
               </div>
-              <p className="text-xs text-gray-500">Leave blank to keep your current password.</p>
+              <p className="text-xs text-cream-dim">Leave blank to keep your current password.</p>
             </div>
           </section>
 
@@ -209,7 +209,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+              className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-ink hover:bg-primary-700 disabled:opacity-60"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>

@@ -61,10 +61,10 @@ export default function Clients() {
   return (
     <Layout title="Clients">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">{clients.length} client(s)</p>
+        <p className="text-sm text-cream-dim">{clients.length} client(s)</p>
         <Link
           to="/clients/new"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink hover:bg-primary-700"
         >
           + Add New Client
         </Link>

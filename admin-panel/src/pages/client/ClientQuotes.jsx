@@ -13,7 +13,7 @@ const STATUS_STYLES = {
   rejected: 'bg-red-100 text-red-700',
   quoted: 'bg-blue-100 text-blue-700',
   won: 'bg-green-100 text-green-700',
-  lost: 'bg-gray-200 text-gray-700',
+  lost: 'bg-line text-cream-dim',
   needs_pricing: 'bg-orange-100 text-orange-700',
 };
 
@@ -92,53 +92,53 @@ export default function ClientQuotes() {
 
   return (
     <ClientLayout title="Quote Requests">
-      <p className="mb-4 text-sm text-gray-500">{quotes.length} quote request(s)</p>
+      <p className="mb-4 text-sm text-cream-dim">{quotes.length} quote request(s)</p>
 
       {loading && <LoadingSpinner label="Loading quote requests…" />}
       {!loading && error && <ErrorMessage message={error} />}
       {!loading && !error && actionError && <ErrorMessage message={actionError} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
+          <table className="min-w-full divide-y divide-line text-sm">
+            <thead className="bg-panel-2">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Date</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Contact</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Item</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Size</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Tier</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Total</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Name</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Contact</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Item</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Size</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Quantity</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Tier</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Total</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {quotes.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-10 text-center text-cream-dim">
                     No quote requests yet.
                   </td>
                 </tr>
               )}
               {quotes.map((quote) => (
-                <tr key={quote.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDateTime(quote.created_at)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-800">{quote.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-800">{quote.contact_number}</td>
-                  <td className="px-4 py-3 text-gray-800">{quote.item_description}</td>
-                  <td className="px-4 py-3 text-gray-800">{quote.size}</td>
-                  <td className="px-4 py-3 text-gray-800">{quote.quantity}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">Tier {quote.tier || 1}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-800">
+                <tr key={quote.id} className="hover:bg-panel-2">
+                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(quote.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.name}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.contact_number}</td>
+                  <td className="px-4 py-3 text-cream">{quote.item_description}</td>
+                  <td className="px-4 py-3 text-cream">{quote.size}</td>
+                  <td className="px-4 py-3 text-cream">{quote.quantity}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim">Tier {quote.tier || 1}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream">
                     {quote.tier === 2 ? `R${Number(quote.total || 0).toFixed(2)}` : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_STYLES[quote.status] || 'bg-gray-100 text-gray-700'
+                        STATUS_STYLES[quote.status] || 'bg-panel-2 text-cream-dim'
                       }`}
                     >
                       {quote.status}
@@ -152,7 +152,7 @@ export default function ClientQuotes() {
                             type="button"
                             onClick={() => handleAction(quote, 'approve')}
                             disabled={pendingId === quote.id}
-                            className="flex-1 rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
+                            className="flex-1 rounded-lg border border-green-500/30 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/10 disabled:opacity-60"
                           >
                             Approve
                           </button>
@@ -160,7 +160,7 @@ export default function ClientQuotes() {
                             type="button"
                             onClick={() => handleAction(quote, 'reject')}
                             disabled={pendingId === quote.id}
-                            className="flex-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                            className="flex-1 rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-60"
                           >
                             Reject
                           </button>
@@ -172,7 +172,7 @@ export default function ClientQuotes() {
                           type="button"
                           onClick={() => handleDownloadPdf(quote)}
                           disabled={pendingId === quote.id}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                          className="w-full rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-60"
                         >
                           Download PDF
                         </button>
@@ -182,7 +182,7 @@ export default function ClientQuotes() {
                         value={OUTCOME_OPTIONS.includes(quote.status) ? quote.status : ''}
                         onChange={(e) => handleStatusChange(quote, e.target.value)}
                         disabled={pendingId === quote.id}
-                        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                        className="w-full rounded-lg border border-line bg-panel-2 px-2 py-1.5 text-xs text-cream-dim focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
                       >
                         <option value="" disabled hidden>
                           Mark as…
