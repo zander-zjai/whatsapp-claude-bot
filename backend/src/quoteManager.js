@@ -79,6 +79,29 @@ function getQuoteById(id) {
   return quotes.find((q) => q.id === id);
 }
 
+// A reply Claude sends shortly after a quote (e.g. the customer just says
+// "thanks") can re-trigger the [[QUOTE_REQUEST]] marker even with prompt
+// instructions not to. This is a safety net against that: skip creating a
+// second quote for the same customer + same request within this window.
+const DUPLICATE_QUOTE_WINDOW_MINUTES = 60;
+
+/**
+ * True if this customer already has a quote for the same item, for this
+ * client, created within the last DUPLICATE_QUOTE_WINDOW_MINUTES.
+ */
+function hasRecentDuplicateQuote(clientId, customerNumber, itemDescription) {
+  const cutoff = Date.now() - DUPLICATE_QUOTE_WINDOW_MINUTES * 60 * 1000;
+  const normalized = String(itemDescription || '').trim().toLowerCase();
+
+  return quotes.some(
+    (q) =>
+      q.client_id === clientId &&
+      q.customer_number === customerNumber &&
+      String(q.item_description || '').trim().toLowerCase() === normalized &&
+      new Date(q.created_at).getTime() >= cutoff
+  );
+}
+
 /** Drop all stored quote requests (and any generated PDFs) for a client. */
 function clearForClient(clientId) {
   quotes
@@ -255,7 +278,7 @@ const QUOTE_REQUEST_INSTRUCTIONS = `QUOTE REQUESTS: If the customer asks for a p
 Once you have ALL FIVE details, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
 [[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"..."}[[/QUOTE_REQUEST]]
 
-Do not include this block until every field has been provided. Otherwise, continue the conversation normally.`;
+Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
 
 /**
  * Build the quote-collection system prompt instructions for a client. Tier 2
@@ -284,7 +307,7 @@ ${priceListText}
 Once you have ALL FIVE details, match what the customer needs against the price list above and work out the quantity for each matching item (e.g. for a "per sqm" item, multiply the dimensions to get square metres; for a "per unit"/"each" item, use the quantity given). Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
 [[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
 
-If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Otherwise, continue the conversation normally.`;
+If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
 }
 
 const QUOTE_MARKER_REGEX = /\[\[QUOTE_REQUEST\]\]([\s\S]*?)\[\[\/QUOTE_REQUEST\]\]/;
@@ -334,6 +357,7 @@ module.exports = {
   getQuotesForClient,
   getAllQuotes,
   getQuoteById,
+  hasRecentDuplicateQuote,
   clearForClient,
   extractQuoteRequest,
   buildQuoteInstructions,

@@ -450,7 +450,9 @@ async function processMessage({ from, phoneNumberId, text }) {
   const sent = await sendReply(client, from, reply);
   if (!sent) status = 'failed';
 
-  if (quote) {
+  if (quote && quoteManager.hasRecentDuplicateQuote(client.id, from, quote.item_description)) {
+    log(`[${client.name}] Skipped duplicate quote request from ${maskPhone(from)} for "${quote.item_description}"`);
+  } else if (quote) {
     let total = 0;
 
     if (quoteManager.isPdfQuoteEnabled(client)) {
