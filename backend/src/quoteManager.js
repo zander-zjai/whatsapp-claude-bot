@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { readJSON, writeJSON, dataPath } = require('./fileStore');
 const { logError } = require('./logger');
+const { DEFAULT_TERMS } = require('./pdfGenerator');
 
 const QUOTES_FILE = 'quotes.json';
 const PDF_DIR = 'quote-pdfs';
@@ -152,6 +153,7 @@ function addPdfQuote(entry) {
     updated_at: now.toISOString(),
     valid_until: validUntil.toISOString(),
     expiry_reminder_sent: false,
+    followup_sent: false,
     ...entry,
   };
 
@@ -205,6 +207,36 @@ function getQuotesNeedingExpiryReminder() {
     const validUntil = new Date(q.valid_until).getTime();
     return validUntil > now && validUntil <= cutoff;
   });
+}
+
+const FOLLOWUP_MIN_HOURS = 24;
+
+/**
+ * Sent Tier 2 quotes older than FOLLOWUP_MIN_HOURS, not yet expired, and
+ * not already followed up — candidates for the "still thinking about it?"
+ * check-in. Doesn't know about conversation activity (that's a cross-module
+ * check the caller does against conversationManager) — this only filters
+ * on the quote record itself.
+ */
+function getQuotesNeedingFollowup() {
+  const now = Date.now();
+  const cutoff = now - FOLLOWUP_MIN_HOURS * 60 * 60 * 1000;
+
+  return quotes.filter((q) => {
+    if (q.tier !== 2 || q.status !== 'sent' || q.followup_sent) return false;
+    const sentAt = new Date(q.updated_at).getTime();
+    const validUntil = new Date(q.valid_until).getTime();
+    return sentAt <= cutoff && validUntil > now;
+  });
+}
+
+/** Mark a quote as having had its silence follow-up sent (never sent twice). */
+function markFollowupSent(id) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+  quote.followup_sent = true;
+  persist();
+  return quote;
 }
 
 /** Mark a quote as having had its expiry reminder sent (never sent twice). */
@@ -345,7 +377,7 @@ function buildQuoteInstructions(client) {
 You have access to this price list:
 ${priceListText}
 
-Once you have ALL FIVE details, match what the customer needs against the price list above and work out the quantity for each matching item (e.g. for a "per sqm" item, multiply the dimensions to get square metres; for a "per unit"/"each" item, use the quantity given). Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
+Once you have ALL FIVE details, match what the customer needs against the price list above and work out the quantity for each matching item (e.g. for a "per sqm" item, multiply the dimensions to get square metres; for a "per unit"/"each" item, use the quantity given). When you state the calculated price to the customer in this same reply, end with a soft close instead of a generic "is there anything else?" — give them a concrete next step, e.g. "This quote is valid for ${QUOTE_VALIDITY_DAYS} days — reply to confirm and we'll get you sorted with a deposit invoice." Adjust the wording naturally to fit the conversation, and reference these terms if it helps: ${client.quote_terms || DEFAULT_TERMS}. (Skip the soft close if nothing matched and no price was given — in that case just let them know the team will follow up.) Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
 [[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
 
 If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
@@ -439,6 +471,8 @@ module.exports = {
   getMostRecentPendingQuote,
   getQuotesNeedingExpiryReminder,
   markExpiryReminderSent,
+  getQuotesNeedingFollowup,
+  markFollowupSent,
   getLatestQuoteForCustomer,
   describeQuoteForCustomer,
   calculateQuoteTotal,

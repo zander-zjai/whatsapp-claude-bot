@@ -50,11 +50,12 @@ quoteManager.load();
 errorLogger.cleanupOldLogs();
 setInterval(() => errorLogger.cleanupOldLogs(), 24 * 60 * 60 * 1000).unref();
 
-// Nudge customers whose sent quote is about to expire. Runs once shortly
-// after boot, then every 6 hours.
-quoteReminders.runExpiryReminders().catch((err) => logError('[quoteReminders] Initial run failed:', err.message));
+// Nudge customers whose sent quote is about to expire, and check in on
+// quotes that have gone quiet for 24+ hours. Runs once shortly after boot,
+// then every 6 hours.
+quoteReminders.runAll().catch((err) => logError('[quoteReminders] Initial run failed:', err.message));
 setInterval(
-  () => quoteReminders.runExpiryReminders().catch((err) => logError('[quoteReminders] Run failed:', err.message)),
+  () => quoteReminders.runAll().catch((err) => logError('[quoteReminders] Run failed:', err.message)),
   6 * 60 * 60 * 1000
 ).unref();
 
