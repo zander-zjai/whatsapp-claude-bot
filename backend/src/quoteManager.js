@@ -151,6 +151,7 @@ function addPdfQuote(entry) {
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
     valid_until: validUntil.toISOString(),
+    expiry_reminder_sent: false,
     ...entry,
   };
 
@@ -184,6 +185,46 @@ function getMostRecentPendingQuote(clientId) {
   for (let i = quotes.length - 1; i >= 0; i--) {
     const q = quotes[i];
     if (q.client_id === clientId && q.tier === 2 && q.status === 'pending') return q;
+  }
+  return undefined;
+}
+
+const EXPIRY_REMINDER_WINDOW_HOURS = 48;
+
+/**
+ * Sent Tier 2 quotes whose valid_until falls within the next
+ * EXPIRY_REMINDER_WINDOW_HOURS and haven't already had a reminder sent —
+ * the candidates for the expiry-reminder nudge.
+ */
+function getQuotesNeedingExpiryReminder() {
+  const now = Date.now();
+  const cutoff = now + EXPIRY_REMINDER_WINDOW_HOURS * 60 * 60 * 1000;
+
+  return quotes.filter((q) => {
+    if (q.tier !== 2 || q.status !== 'sent' || q.expiry_reminder_sent) return false;
+    const validUntil = new Date(q.valid_until).getTime();
+    return validUntil > now && validUntil <= cutoff;
+  });
+}
+
+/** Mark a quote as having had its expiry reminder sent (never sent twice). */
+function markExpiryReminderSent(id) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+  quote.expiry_reminder_sent = true;
+  persist();
+  return quote;
+}
+
+/**
+ * Most recent quote (either tier) for a specific customer number, for
+ * injecting "what's the status of my quote" context into Claude's system
+ * prompt — undefined if this customer has no quotes on record.
+ */
+function getLatestQuoteForCustomer(clientId, customerNumber) {
+  for (let i = quotes.length - 1; i >= 0; i--) {
+    const q = quotes[i];
+    if (q.client_id === clientId && q.customer_number === customerNumber) return q;
   }
   return undefined;
 }
@@ -351,6 +392,36 @@ function extractQuoteRequest(replyText) {
   return { text, quote };
 }
 
+const STATUS_DESCRIPTIONS = {
+  pending: 'still awaiting approval from our team',
+  approved: 'approved and about to be sent to you',
+  sent: 'sent to you and awaiting your decision',
+  rejected: 'being reviewed manually by our team — someone will follow up',
+  quoted: 'quoted and awaiting your decision',
+  won: 'confirmed — thank you for your business',
+  lost: 'closed out',
+};
+
+/**
+ * One-line, customer-facing description of a customer's most recent quote,
+ * for injecting into Claude's system prompt so it can answer "what's the
+ * status of my quote?" directly without involving the owner. Returns null
+ * if this customer has no quotes on record.
+ */
+function describeQuoteForCustomer(clientId, customerNumber) {
+  const quote = getLatestQuoteForCustomer(clientId, customerNumber);
+  if (!quote) return null;
+
+  const itemDesc = quote.item_description || 'their request';
+  const statusText = STATUS_DESCRIPTIONS[quote.status] || quote.status;
+
+  if (quote.tier === 2 && quote.total > 0) {
+    const validity = quote.valid_until ? ` (valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')})` : '';
+    return `Their most recent quote: ${itemDesc}, total R${Number(quote.total).toFixed(2)}, status: ${statusText}${validity}.`;
+  }
+  return `Their most recent quote request: ${itemDesc}, status: ${statusText}.`;
+}
+
 module.exports = {
   load,
   addQuote,
@@ -366,6 +437,10 @@ module.exports = {
   addPdfQuote,
   setQuoteStatus,
   getMostRecentPendingQuote,
+  getQuotesNeedingExpiryReminder,
+  markExpiryReminderSent,
+  getLatestQuoteForCustomer,
+  describeQuoteForCustomer,
   calculateQuoteTotal,
   getPdfFilePath,
   savePdfFile,

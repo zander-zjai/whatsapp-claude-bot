@@ -431,6 +431,7 @@ async function processMessage({ from, phoneNumberId, text }) {
     const rawReply = await getClaudeReply(client, history, {
       returningCustomerName,
       quoteRequestsEnabled: !!client.quote_requests_enabled,
+      quoteStatusSummary: quoteManager.describeQuoteForCustomer(client.id, from),
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);

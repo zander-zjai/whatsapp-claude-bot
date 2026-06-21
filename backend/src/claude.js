@@ -47,6 +47,9 @@ function resolveApiKey(client) {
  *   has messaged before and previously gave their name.
  * @param {boolean} [options.quoteRequestsEnabled] - Append quote-collection
  *   instructions for this client.
+ * @param {string|null} [options.quoteStatusSummary] - One-line description of
+ *   this customer's most recent quote, so Claude can answer "what's the
+ *   status of my quote?" directly instead of involving the owner.
  */
 function buildSystemPrompt(client, options = {}) {
   const parts = [client.system_prompt];
@@ -59,6 +62,12 @@ function buildSystemPrompt(client, options = {}) {
 
   if (options.quoteRequestsEnabled) {
     parts.push(quoteManager.buildQuoteInstructions(client));
+  }
+
+  if (options.quoteStatusSummary) {
+    parts.push(
+      `QUOTE STATUS: ${options.quoteStatusSummary} If the customer asks about the status of their quote or order, answer directly using this information — you don't need to involve the owner.`
+    );
   }
 
   return parts.join('\n\n');

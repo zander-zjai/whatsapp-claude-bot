@@ -22,6 +22,7 @@ const settingsManager = require('./src/settingsManager');
 const logsManager = require('./src/logsManager');
 const conversationManager = require('./src/conversationManager');
 const quoteManager = require('./src/quoteManager');
+const quoteReminders = require('./src/quoteReminders');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
 const clientPortalRoutes = require('./src/clientPortalRoutes');
@@ -48,6 +49,14 @@ quoteManager.load();
 // Drop error-log files older than 7 days, then once a day thereafter.
 errorLogger.cleanupOldLogs();
 setInterval(() => errorLogger.cleanupOldLogs(), 24 * 60 * 60 * 1000).unref();
+
+// Nudge customers whose sent quote is about to expire. Runs once shortly
+// after boot, then every 6 hours.
+quoteReminders.runExpiryReminders().catch((err) => logError('[quoteReminders] Initial run failed:', err.message));
+setInterval(
+  () => quoteReminders.runExpiryReminders().catch((err) => logError('[quoteReminders] Run failed:', err.message)),
+  6 * 60 * 60 * 1000
+).unref();
 
 if (!process.env.VERIFY_TOKEN) {
   logError('VERIFY_TOKEN is not set in .env — Meta webhook verification will fail.');
