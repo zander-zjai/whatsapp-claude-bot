@@ -5,7 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
 import { getClientConversation, setClientConversationHandover } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
-import { maskPhoneNumber, truncate, formatDateTime } from '../../utils/format';
+import { maskPhoneNumber, formatDateTime } from '../../utils/format';
 
 function conversationStatus(conv) {
   if (conv.handover_active) return 'handover';
@@ -24,6 +24,77 @@ const STATUS_CLASSES = {
   awaiting_human: 'bg-yellow-100 text-yellow-700',
   handover: 'bg-blue-100 text-blue-700',
 };
+
+const LEAD_CLASSES = {
+  hot: 'bg-red-100 text-red-700',
+  warm: 'bg-orange-100 text-orange-700',
+  cold: 'bg-gray-100 text-gray-500',
+};
+
+const PRIORITY_CLASSES = {
+  high: 'bg-red-100 text-red-700',
+  medium: 'bg-orange-100 text-orange-700',
+  low: 'bg-gray-100 text-gray-500',
+};
+
+// Bold + highlight Rand amounts (e.g. "R5,400.00") so prices jump out when
+// scanning a long quote conversation.
+const AMOUNT_REGEX = /(R\s?[\d,]+(?:\.\d{2})?)/g;
+
+function highlightAmounts(text) {
+  const parts = String(text || '').split(AMOUNT_REGEX);
+  return parts.map((part, i) =>
+    AMOUNT_REGEX.test(part) ? (
+      <strong key={i} className="text-green-700">
+        {part}
+      </strong>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
+function MessageBubble({ msg }) {
+  const isFailed = msg.status === 'failed';
+
+  return (
+    <div className="space-y-1">
+      {msg.customer_message && (
+        <div className="flex justify-start">
+          <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-800">
+            <p className="whitespace-pre-wrap">{highlightAmounts(msg.customer_message)}</p>
+            <p className="mt-1 text-[11px] text-gray-400">{formatDateTime(msg.timestamp)}</p>
+          </div>
+        </div>
+      )}
+
+      {msg.bot_reply && (
+        <div className="flex justify-end">
+          <div
+            className={`max-w-[75%] rounded-2xl rounded-br-sm px-4 py-2 text-sm ${
+              isFailed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary/10 text-gray-900'
+            }`}
+          >
+            <p className="whitespace-pre-wrap">{highlightAmounts(msg.bot_reply)}</p>
+            <div className="mt-1 flex items-center justify-end gap-2">
+              {isFailed && (
+                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                  failed
+                </span>
+              )}
+              {msg.status === 'handover' && (
+                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                  handover
+                </span>
+              )}
+              <p className="text-[11px] text-gray-400">{formatDateTime(msg.timestamp)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ClientConversationDetail() {
   const { customerNumber } = useParams();
@@ -71,6 +142,7 @@ export default function ClientConversationDetail() {
   }
 
   const status = conversation ? conversationStatus(conversation) : null;
+  const failedCount = messages.filter((m) => m.status === 'failed').length;
 
   return (
     <ClientLayout title="Conversation">
@@ -85,13 +157,34 @@ export default function ClientConversationDetail() {
 
       {!loading && !error && conversation && (
         <>
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-base font-semibold text-gray-900">
                 {conversation.customer_name || 'Unknown customer'}
               </p>
               <p className="font-mono text-xs text-gray-500">{maskPhoneNumber(conversation.customer_number)}</p>
               <p className="mt-1 text-xs text-gray-500">Last active: {formatDateTime(conversation.last_message_at)}</p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {conversation.lead_temperature && (
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${LEAD_CLASSES[conversation.lead_temperature]}`}
+                    title={conversation.lead_reason || ''}
+                  >
+                    {conversation.lead_temperature} lead
+                  </span>
+                )}
+                {conversation.priority && (
+                  <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${PRIORITY_CLASSES[conversation.priority]}`}>
+                    {conversation.priority} priority
+                  </span>
+                )}
+                {failedCount > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+                    {failedCount} failed repl{failedCount === 1 ? 'y' : 'ies'}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -115,50 +208,14 @@ export default function ClientConversationDetail() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Timestamp</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer Message</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Reply</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {messages.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-gray-500">
-                      No messages yet.
-                    </td>
-                  </tr>
-                )}
-                {messages.map((msg) => (
-                  <tr key={msg.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDateTime(msg.timestamp)}</td>
-                    <td className="px-4 py-3 text-gray-800" title={msg.customer_message}>
-                      {truncate(msg.customer_message, 80)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-800" title={msg.bot_reply}>
-                      {truncate(msg.bot_reply, 80)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-medium ${
-                          msg.status === 'success'
-                            ? 'bg-green-100 text-green-700'
-                            : msg.status === 'handover'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {msg.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            {messages.length === 0 ? (
+              <p className="py-10 text-center text-gray-500">No messages yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+              </div>
+            )}
           </div>
         </>
       )}
