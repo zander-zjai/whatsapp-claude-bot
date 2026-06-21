@@ -1,5 +1,4 @@
 'use strict';
-// no-op: final verification after removing stale CLIENTS_JSON env var (2026-06-21)
 
 const fs = require('fs');
 const path = require('path');
