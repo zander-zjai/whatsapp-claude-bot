@@ -7,7 +7,11 @@ const { logError } = require('./logger');
 const PAGE_MARGIN = 50;
 const TABLE_LEFT = 50;
 const TABLE_RIGHT = 545;
-const COL = { item: 50, unit: 280, qty: 360, unitPrice: 420, total: 490 };
+const COL = { item: 50, unit: 260, qty: 330, unitPrice: 390, total: 460 };
+
+const INK = '#111827';
+const MUTED = '#6B7280';
+const SUBTLE = '#9CA3AF';
 
 const DEFAULT_TERMS =
   'This quote is valid for 7 days from the date of issue. Prices are subject to change after ' +
@@ -15,7 +19,10 @@ const DEFAULT_TERMS =
   'South African Rand (ZAR).';
 
 function formatCurrency(amount) {
-  return `R${(Number(amount) || 0).toFixed(2)}`;
+  const value = (Number(amount) || 0).toFixed(2);
+  const [whole, cents] = value.split('.');
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `R${withCommas}.${cents}`;
 }
 
 function formatDate(value) {
@@ -42,6 +49,27 @@ async function fetchLogo(logoUrl) {
   }
 }
 
+function drawFooter(doc, brandColor, clientName) {
+  // Stay safely inside the bottom margin boundary — pdfkit auto-paginates
+  // text that would overflow past it, which previously stranded the
+  // footer alone on a blank second page.
+  const footerY = doc.page.height - PAGE_MARGIN - 26;
+  doc
+    .moveTo(PAGE_MARGIN, footerY)
+    .lineTo(TABLE_RIGHT, footerY)
+    .lineWidth(0.5)
+    .strokeColor('#E5E7EB')
+    .stroke();
+
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor(SUBTLE)
+    .text(`Thank you for choosing ${clientName || 'us'}.`, PAGE_MARGIN, footerY + 8, {
+      width: TABLE_RIGHT - PAGE_MARGIN,
+    });
+}
+
 /**
  * Render a branded PDF quote for a Tier 2 quote record.
  *
@@ -62,55 +90,92 @@ async function generateQuotePdf(client, quote) {
     doc.on('error', reject);
   });
 
-  // Header: logo top-left, business name top-right.
-  let headerBottom = PAGE_MARGIN;
+  // Top accent band.
+  doc.rect(0, 0, doc.page.width, 8).fill(brandColor);
+
+  // Header: logo top-left, business name + "QUOTE" badge top-right.
+  let headerBottom = PAGE_MARGIN + 20;
   if (logoBuffer) {
     try {
-      doc.image(logoBuffer, PAGE_MARGIN, PAGE_MARGIN, { fit: [120, 60] });
-      headerBottom = Math.max(headerBottom, PAGE_MARGIN + 60);
+      doc.image(logoBuffer, PAGE_MARGIN, PAGE_MARGIN + 20, { fit: [130, 60] });
+      headerBottom = Math.max(headerBottom, PAGE_MARGIN + 20 + 60);
     } catch (err) {
       logError('Failed to embed quote logo:', err.message);
     }
   }
 
   doc
-    .fillColor(brandColor)
+    .fillColor(INK)
     .font('Helvetica-Bold')
-    .fontSize(18)
-    .text(client.name || '', PAGE_MARGIN, PAGE_MARGIN, {
+    .fontSize(20)
+    .text(client.name || '', PAGE_MARGIN, PAGE_MARGIN + 20, {
       align: 'right',
       width: TABLE_RIGHT - PAGE_MARGIN,
     });
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(brandColor)
+    .text('QUOTATION', PAGE_MARGIN, doc.y + 2, {
+      align: 'right',
+      width: TABLE_RIGHT - PAGE_MARGIN,
+      characterSpacing: 1.5,
+    });
   headerBottom = Math.max(headerBottom, doc.y);
 
-  doc.y = headerBottom + 20;
+  doc.x = PAGE_MARGIN;
+  doc.y = headerBottom + 30;
 
-  // Title.
-  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(24).text('QUOTE', PAGE_MARGIN, doc.y);
-  doc.moveDown(0.5);
-
-  // Quote meta block.
-  doc.font('Helvetica').fontSize(10).fillColor('#374151');
-  doc.text(`Quote #: ${String(quote.id).slice(0, 8).toUpperCase()}`);
-  doc.text(`Date: ${formatDate(quote.created_at)}`);
-  doc.text(`Valid until: ${formatDate(quote.valid_until)}`);
-  doc.moveDown(0.75);
-
-  // Divider.
+  // Divider under header.
   doc
     .moveTo(PAGE_MARGIN, doc.y)
     .lineTo(TABLE_RIGHT, doc.y)
-    .lineWidth(2)
+    .lineWidth(1.5)
     .strokeColor(brandColor)
     .stroke();
-  doc.moveDown(0.75);
+  doc.y += 20;
 
-  // Customer block.
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Quote For:');
-  doc.font('Helvetica').fontSize(10).fillColor('#374151');
-  doc.text(quote.name || '');
-  if (quote.contact_number) doc.text(quote.contact_number);
-  doc.moveDown(1);
+  // Two-column meta block: "Quote For" on the left, quote details on the right.
+  const metaTop = doc.y;
+  const colWidth = (TABLE_RIGHT - PAGE_MARGIN - 20) / 2;
+
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(SUBTLE).text('QUOTE FOR', PAGE_MARGIN, metaTop, {
+    characterSpacing: 1,
+  });
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(12)
+    .fillColor(INK)
+    .text(quote.name || '', PAGE_MARGIN, doc.y + 4, { width: colWidth });
+  if (quote.contact_number) {
+    doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(quote.contact_number, PAGE_MARGIN, doc.y + 2);
+  }
+
+  const metaRightX = PAGE_MARGIN + colWidth + 20;
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(SUBTLE).text('QUOTE DETAILS', metaRightX, metaTop, {
+    width: colWidth,
+    align: 'right',
+    characterSpacing: 1,
+  });
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(MUTED)
+    .text(`Quote #: ${String(quote.id).slice(0, 8).toUpperCase()}`, metaRightX, doc.y + 4, {
+      width: colWidth,
+      align: 'right',
+    })
+    .text(`Date: ${formatDate(quote.created_at)}`, metaRightX, doc.y + 2, {
+      width: colWidth,
+      align: 'right',
+    })
+    .text(`Valid until: ${formatDate(quote.valid_until)}`, metaRightX, doc.y + 2, {
+      width: colWidth,
+      align: 'right',
+    });
+
+  doc.x = PAGE_MARGIN;
+  doc.y += 30;
 
   // Line items table.
   const items =
@@ -126,22 +191,28 @@ async function generateQuotePdf(client, quote) {
           },
         ];
 
-  const rowHeight = 24;
+  const rowHeight = 26;
   let tableTop = doc.y;
 
   function drawTableHeader(y) {
     doc.rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, rowHeight).fill(brandColor);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(10);
-    doc.text('Item', COL.item + 5, y + 7, { width: COL.unit - COL.item - 10 });
-    doc.text('Unit', COL.unit + 5, y + 7, { width: COL.qty - COL.unit - 10 });
-    doc.text('Qty', COL.qty + 5, y + 7, { width: COL.unitPrice - COL.qty - 10, align: 'right' });
-    doc.text('Unit Price', COL.unitPrice + 5, y + 7, {
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(9);
+    doc.text('ITEM', COL.item + 10, y + 9, { width: COL.unit - COL.item - 10, characterSpacing: 0.5 });
+    doc.text('UNIT', COL.unit + 5, y + 9, { width: COL.qty - COL.unit - 10, characterSpacing: 0.5 });
+    doc.text('QTY', COL.qty + 5, y + 9, {
+      width: COL.unitPrice - COL.qty - 10,
+      align: 'right',
+      characterSpacing: 0.5,
+    });
+    doc.text('UNIT PRICE', COL.unitPrice + 5, y + 9, {
       width: COL.total - COL.unitPrice - 10,
       align: 'right',
+      characterSpacing: 0.5,
     });
-    doc.text('Total', COL.total + 5, y + 7, {
+    doc.text('TOTAL', COL.total + 5, y + 9, {
       width: TABLE_RIGHT - COL.total - 10,
       align: 'right',
+      characterSpacing: 0.5,
     });
     return y + rowHeight;
   }
@@ -149,28 +220,32 @@ async function generateQuotePdf(client, quote) {
   let y = drawTableHeader(tableTop);
 
   items.forEach((item, index) => {
-    if (y + rowHeight > doc.page.height - PAGE_MARGIN - 150) {
+    if (y + rowHeight > doc.page.height - PAGE_MARGIN - 160) {
+      drawFooter(doc, brandColor, client.name);
       doc.addPage();
-      y = PAGE_MARGIN;
+      doc.rect(0, 0, doc.page.width, 8).fill(brandColor);
+      y = PAGE_MARGIN + 20;
       y = drawTableHeader(y);
     }
 
     if (index % 2 === 1) {
-      doc.rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, rowHeight).fill('#F3F4F6');
+      doc.rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, rowHeight).fill('#F9FAFB');
     }
 
-    doc.fillColor('#111827').font('Helvetica').fontSize(10);
-    doc.text(item.item || '', COL.item + 5, y + 7, { width: COL.unit - COL.item - 10 });
-    doc.text(item.unit || '', COL.unit + 5, y + 7, { width: COL.qty - COL.unit - 10 });
-    doc.text(String(item.quantity ?? ''), COL.qty + 5, y + 7, {
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(10);
+    doc.text(item.item || '', COL.item + 10, y + 8, { width: COL.unit - COL.item - 10 });
+    doc.font('Helvetica').fillColor(MUTED);
+    doc.text(item.unit || '', COL.unit + 5, y + 8, { width: COL.qty - COL.unit - 10 });
+    doc.text(String(item.quantity ?? ''), COL.qty + 5, y + 8, {
       width: COL.unitPrice - COL.qty - 10,
       align: 'right',
     });
-    doc.text(formatCurrency(item.unit_price), COL.unitPrice + 5, y + 7, {
+    doc.text(formatCurrency(item.unit_price), COL.unitPrice + 5, y + 8, {
       width: COL.total - COL.unitPrice - 10,
       align: 'right',
     });
-    doc.text(formatCurrency(item.line_total), COL.total + 5, y + 7, {
+    doc.fillColor(INK).font('Helvetica-Bold');
+    doc.text(formatCurrency(item.line_total), COL.total + 5, y + 8, {
       width: TABLE_RIGHT - COL.total - 10,
       align: 'right',
     });
@@ -178,29 +253,47 @@ async function generateQuotePdf(client, quote) {
     y += rowHeight;
   });
 
-  // Total row.
-  doc.rect(TABLE_LEFT, y, TABLE_RIGHT - TABLE_LEFT, rowHeight).fill(brandColor);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11);
-  doc.text('Total', COL.unitPrice + 5, y + 7, {
-    width: COL.total - COL.unitPrice - 10,
-    align: 'right',
-  });
-  doc.text(formatCurrency(quote.total), COL.total + 5, y + 7, {
-    width: TABLE_RIGHT - COL.total - 10,
-    align: 'right',
-  });
-  y += rowHeight;
+  // Thin separator, then the total row sits below the table rather than
+  // inside it — reads more like an invoice total than another line item.
+  doc
+    .moveTo(TABLE_LEFT, y)
+    .lineTo(TABLE_RIGHT, y)
+    .lineWidth(1)
+    .strokeColor('#E5E7EB')
+    .stroke();
+  y += 14;
 
-  doc.y = y + 30;
+  const totalAmountWidth = 150;
+  const totalAmountX = TABLE_RIGHT - totalAmountWidth;
+  const totalLabelWidth = 100;
+  const totalLabelX = totalAmountX - totalLabelWidth - 10;
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(INK);
+  doc.text('TOTAL', totalLabelX, y, {
+    width: totalLabelWidth,
+    align: 'right',
+    characterSpacing: 0.5,
+  });
+  doc.fillColor(brandColor).fontSize(14);
+  doc.text(formatCurrency(quote.total), totalAmountX, y - 2, {
+    width: totalAmountWidth,
+    align: 'right',
+  });
+  y += 30;
+
+  doc.x = PAGE_MARGIN;
+  doc.y = y + 20;
 
   // Terms & conditions.
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Terms & Conditions');
-  doc.moveDown(0.25);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(INK).text('Terms & Conditions', PAGE_MARGIN, doc.y);
+  doc.moveDown(0.3);
   doc
     .font('Helvetica')
     .fontSize(9)
-    .fillColor('#6B7280')
-    .text(client.quote_terms || DEFAULT_TERMS, { width: TABLE_RIGHT - PAGE_MARGIN });
+    .fillColor(MUTED)
+    .text(client.quote_terms || DEFAULT_TERMS, PAGE_MARGIN, doc.y, { width: TABLE_RIGHT - PAGE_MARGIN });
+
+  drawFooter(doc, brandColor, client.name);
 
   doc.end();
   return done;
