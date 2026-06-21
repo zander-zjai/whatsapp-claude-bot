@@ -57,10 +57,27 @@ function getConversation(clientId, customerNumber) {
       last_message_preview: '',
       lead_temperature: null,
       lead_reason: '',
+      priority: null, // 'high' | 'medium' | 'low' | null — set manually by the owner in the portal
       updated_at: new Date().toISOString(),
     };
   }
   return conversations[key];
+}
+
+const VALID_PRIORITIES = ['high', 'medium', 'low'];
+
+/**
+ * Set (or clear) a customer's manually-assigned priority tier. Unlike
+ * lead_temperature (auto-inferred per message from conversation content),
+ * this is the owner's own judgement of the customer and persists until
+ * changed — pass null/undefined to clear it.
+ */
+function setPriority(clientId, customerNumber, priority) {
+  const conv = getConversation(clientId, customerNumber);
+  conv.priority = VALID_PRIORITIES.includes(priority) ? priority : null;
+  conv.updated_at = new Date().toISOString();
+  persist();
+  return conv;
 }
 
 /** Update the conversation's lead-temperature tag (hot/warm/cold) + reason. */
@@ -182,6 +199,7 @@ module.exports = {
   setAwaitingHuman,
   setCustomerName,
   setLeadTag,
+  setPriority,
   findConversationByNumber,
   findMostRecent,
   getConversationsForClient,

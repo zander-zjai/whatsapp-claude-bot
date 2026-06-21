@@ -4,8 +4,11 @@ const { normalizeNumber } = require('./phone');
 
 // If a customer's message contains any of these (case-insensitive), Zara
 // hands off to a human: replies with a connect-you-with-someone message and
-// notifies the business owner.
-const URGENT_KEYWORDS = ['speak to a person', 'talk to someone', 'human', 'urgent'];
+// notifies the business owner. Deliberately limited to explicit requests for
+// a person — words like "urgent" are too common in everyday phrasing (e.g.
+// signage customers calling routine jobs "urgent") to be a reliable signal,
+// and would otherwise block Zara from giving normal quotes/replies.
+const URGENT_KEYWORDS = ['speak to a person', 'speak to someone', 'talk to a person', 'talk to someone', 'speak to a human', 'talk to a human'];
 
 /** True if the message contains any of the urgent/human-handoff keywords. */
 function isUrgentMessage(text) {

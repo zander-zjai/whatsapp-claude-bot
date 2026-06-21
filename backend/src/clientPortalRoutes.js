@@ -108,6 +108,32 @@ router.post('/conversations/handover', (req, res) => {
   res.json({ conversation });
 });
 
+/**
+ * POST /client/conversations/priority — set or clear the owner's manual
+ * priority tier for a customer (high/medium/low/none), independent of the
+ * auto-inferred lead_temperature. Body: { customer_number, priority }.
+ */
+router.post('/conversations/priority', (req, res) => {
+  const { customer_number: customerNumber, priority } = req.body || {};
+
+  if (!customerNumber) {
+    return res.status(400).json({ error: 'customer_number is required' });
+  }
+
+  const ALLOWED = ['high', 'medium', 'low', null, 'none'];
+  if (!ALLOWED.includes(priority)) {
+    return res.status(400).json({ error: 'priority must be one of: high, medium, low, none' });
+  }
+
+  const conversation = conversationManager.setPriority(
+    req.clientId,
+    customerNumber,
+    priority === 'none' ? null : priority
+  );
+  log(`Client portal: ${req.client.name} set priority "${priority}" for ${customerNumber}`);
+  res.json({ conversation });
+});
+
 // ------------------------------------------------------------------
 // Quote requests
 // ------------------------------------------------------------------

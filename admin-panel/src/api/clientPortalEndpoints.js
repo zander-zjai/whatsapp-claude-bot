@@ -21,6 +21,11 @@ export const setClientConversationHandover = (customerNumber, active) =>
     .post('/client/conversations/handover', { customer_number: customerNumber, active })
     .then((r) => r.data.conversation);
 
+export const setClientConversationPriority = (customerNumber, priority) =>
+  clientPortalApi
+    .post('/client/conversations/priority', { customer_number: customerNumber, priority: priority || 'none' })
+    .then((r) => r.data.conversation);
+
 // --- Quote requests ---
 export const getClientQuotes = () => clientPortalApi.get('/client/quotes').then((r) => r.data.quotes);
 

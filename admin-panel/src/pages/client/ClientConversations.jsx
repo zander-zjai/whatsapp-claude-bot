@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
-import { getClientConversations, setClientConversationHandover } from '../../api/clientPortalEndpoints';
+import {
+  getClientConversations,
+  setClientConversationHandover,
+  setClientConversationPriority,
+} from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
 import { maskPhoneNumber, truncate, formatDateTime } from '../../utils/format';
 
@@ -41,6 +45,22 @@ function LeadBadge({ temperature, reason }) {
       {temperature}
     </span>
   );
+}
+
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+const PRIORITY_SELECT_CLASSES = {
+  high: 'border-red-300 bg-red-50 text-red-700',
+  medium: 'border-orange-300 bg-orange-50 text-orange-700',
+  low: 'border-gray-300 bg-gray-50 text-gray-600',
+};
+
+function sortByPriority(conversations) {
+  return [...conversations].sort((a, b) => {
+    const pa = PRIORITY_ORDER[a.priority] ?? 3;
+    const pb = PRIORITY_ORDER[b.priority] ?? 3;
+    if (pa !== pb) return pa - pb;
+    return new Date(b.updated_at) - new Date(a.updated_at);
+  });
 }
 
 export default function ClientConversations() {
@@ -82,6 +102,18 @@ export default function ClientConversations() {
     }
   }
 
+  async function handlePriorityChange(conv, priority) {
+    setActionError('');
+    try {
+      const updated = await setClientConversationPriority(conv.customer_number, priority);
+      setConversations((prev) =>
+        prev.map((c) => (c.customer_number === conv.customer_number ? updated : c))
+      );
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Failed to update priority'));
+    }
+  }
+
   return (
     <ClientLayout title="Conversations">
       <p className="mb-4 text-sm text-gray-500">{conversations.length} conversation(s)</p>
@@ -103,6 +135,7 @@ export default function ClientConversations() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Message</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Active</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Priority</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
@@ -111,12 +144,12 @@ export default function ClientConversations() {
             <tbody className="divide-y divide-gray-100">
               {conversations.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                     No conversations yet.
                   </td>
                 </tr>
               )}
-              {conversations.map((conv) => {
+              {sortByPriority(conversations).map((conv) => {
                 const status = conversationStatus(conv);
                 return (
                   <tr key={conv.customer_number} className="hover:bg-gray-50">
@@ -135,6 +168,20 @@ export default function ClientConversations() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                       {formatDateTime(conv.last_message_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <select
+                        value={conv.priority || ''}
+                        onChange={(e) => handlePriorityChange(conv, e.target.value || null)}
+                        className={`rounded-lg border px-2 py-1 text-xs font-medium capitalize ${
+                          conv.priority ? PRIORITY_SELECT_CLASSES[conv.priority] : 'border-gray-300 text-gray-500'
+                        }`}
+                      >
+                        <option value="">None</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <LeadBadge temperature={conv.lead_temperature} reason={conv.lead_reason} />

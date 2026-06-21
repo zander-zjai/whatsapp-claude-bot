@@ -42,6 +42,21 @@ function LeadBadge({ temperature, reason }) {
   );
 }
 
+const PRIORITY_CLASSES = {
+  high: 'bg-red-100 text-red-700',
+  medium: 'bg-orange-100 text-orange-700',
+  low: 'bg-gray-100 text-gray-500',
+};
+
+function PriorityBadge({ priority }) {
+  if (!priority) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${PRIORITY_CLASSES[priority]}`}>
+      {priority}
+    </span>
+  );
+}
+
 function conversationKey(conv) {
   return `${conv.client_id}:${conv.customer_number}`;
 }
@@ -112,6 +127,7 @@ export default function Conversations() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Message</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Last Active</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Priority</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Lead</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
@@ -120,7 +136,7 @@ export default function Conversations() {
             <tbody className="divide-y divide-gray-100">
               {conversations.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
                     No conversations yet.
                   </td>
                 </tr>
@@ -143,6 +159,9 @@ export default function Conversations() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                       {formatDateTime(conv.last_message_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <PriorityBadge priority={conv.priority} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <LeadBadge temperature={conv.lead_temperature} reason={conv.lead_reason} />
