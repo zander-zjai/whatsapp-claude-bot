@@ -1,5 +1,5 @@
 'use strict';
-// no-op: verifying persistent volume survives a redeploy (2026-06-21)
+// no-op: verifying persistent volume survives a redeploy (2026-06-21) v2
 
 const fs = require('fs');
 const path = require('path');
