@@ -158,7 +158,7 @@ router.patch('/quotes/:id', async (req, res) => {
     return res.status(404).json({ error: 'Quote not found' });
   }
 
-  const { action, status } = req.body || {};
+  const { action, status, eta } = req.body || {};
 
   if (action) {
     if (action !== 'approve' && action !== 'reject') {
@@ -169,7 +169,7 @@ router.patch('/quotes/:id', async (req, res) => {
     }
 
     if (action === 'approve') {
-      const result = await quoteActions.approveQuote(req.client, quote);
+      const result = await quoteActions.approveQuote(req.client, quote, eta);
       if (!result.ok) {
         const message =
           result.reason === 'pdf_missing'

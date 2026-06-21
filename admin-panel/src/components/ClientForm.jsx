@@ -32,6 +32,8 @@ export const DEFAULT_CLIENT_VALUES = {
   logo_url: '',
   brand_color: '#1E3A8A',
   quote_terms: '',
+  payment_link_url: '',
+  banking_details: '',
   monthly_fee: 3000,
   payment_status: 'unpaid',
   service_package: '',
@@ -533,6 +535,35 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                   />
                   <p className="mt-1 text-xs text-cream-dim">
                     Shown on the generated PDF. Leave blank to use the default terms.
+                  </p>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Payment Link URL</label>
+                  <input
+                    type="text"
+                    value={values.payment_link_url}
+                    onChange={(e) => set('payment_link_url', e.target.value)}
+                    placeholder="https://pay.yoco.com/..."
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-cream-dim">
+                    Sent to the customer when the owner approves a quote. Leave blank until a
+                    payment provider is set up — falls back to EFT banking details below.
+                  </p>
+                </div>
+
+                <div>
+                  <label className={labelClass}>EFT Banking Details</label>
+                  <textarea
+                    value={values.banking_details}
+                    onChange={(e) => set('banking_details', e.target.value)}
+                    rows={4}
+                    placeholder={'Bank: \nAccount name: \nAccount number: \nBranch code: \nReference: customer name'}
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-cream-dim">
+                    Fallback payment instructions sent with the quote when no payment link is set.
                   </p>
                 </div>
               </>

@@ -154,6 +154,7 @@ function addPdfQuote(entry) {
     valid_until: validUntil.toISOString(),
     expiry_reminder_sent: false,
     followup_sent: false,
+    eta: null,
     ...entry,
   };
 
@@ -178,6 +179,15 @@ function setQuoteStatus(id, status) {
   if (!quote) return undefined;
   quote.status = status;
   quote.updated_at = new Date().toISOString();
+  persist();
+  return quote;
+}
+
+/** Set the owner-provided ETA (free text, e.g. "7-10 working days") on a quote. */
+function setQuoteEta(id, eta) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+  quote.eta = eta || null;
   persist();
   return quote;
 }
@@ -468,6 +478,7 @@ module.exports = {
   isPdfQuoteEnabled,
   addPdfQuote,
   setQuoteStatus,
+  setQuoteEta,
   getMostRecentPendingQuote,
   getQuotesNeedingExpiryReminder,
   markExpiryReminderSent,

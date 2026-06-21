@@ -19,12 +19,27 @@ const STATUS_STYLES = {
 
 const OUTCOME_OPTIONS = ['pending', 'quoted', 'won', 'lost'];
 
+const TABS = [
+  { key: 'open', label: 'Open' },
+  { key: 'won', label: 'Won' },
+  { key: 'lost', label: 'Lost' },
+];
+
+function tabForStatus(status) {
+  if (status === 'won') return 'won';
+  if (status === 'lost' || status === 'rejected') return 'lost';
+  return 'open';
+}
+
 export default function ClientQuotes() {
   const [quotes, setQuotes] = useState([]);
+  const [tab, setTab] = useState('open');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [pendingId, setPendingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
+  const [etaDraft, setEtaDraft] = useState('');
 
   async function load() {
     setLoading(true);
@@ -43,14 +58,40 @@ export default function ClientQuotes() {
     load();
   }, []);
 
-  async function handleAction(quote, action) {
+  function startApproving(quote) {
+    setActionError('');
+    setApprovingId(quote.id);
+    setEtaDraft('');
+  }
+
+  function cancelApproving() {
+    setApprovingId(null);
+    setEtaDraft('');
+  }
+
+  async function confirmApprove(quote) {
     setActionError('');
     setPendingId(quote.id);
     try {
-      const updated = await updateClientQuote(quote.id, { action });
+      const updated = await updateClientQuote(quote.id, { action: 'approve', eta: etaDraft });
+      setQuotes((prev) => prev.map((q) => (q.id === quote.id ? updated : q)));
+      setApprovingId(null);
+      setEtaDraft('');
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Failed to approve quote'));
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function handleReject(quote) {
+    setActionError('');
+    setPendingId(quote.id);
+    try {
+      const updated = await updateClientQuote(quote.id, { action: 'reject' });
       setQuotes((prev) => prev.map((q) => (q.id === quote.id ? updated : q)));
     } catch (err) {
-      setActionError(getErrorMessage(err, `Failed to ${action} quote`));
+      setActionError(getErrorMessage(err, 'Failed to reject quote'));
     } finally {
       setPendingId(null);
     }
@@ -90,9 +131,29 @@ export default function ClientQuotes() {
     }
   }
 
+  const visibleQuotes = quotes.filter((q) => tabForStatus(q.status) === tab);
+  const counts = quotes.reduce((acc, q) => {
+    const t = tabForStatus(q.status);
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <ClientLayout title="Quote Requests">
-      <p className="mb-4 text-sm text-cream-dim">{quotes.length} quote request(s)</p>
+      <div className="mb-4 flex gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t.key ? 'bg-primary text-ink' : 'border border-line text-cream-dim hover:bg-panel-2'
+            }`}
+          >
+            {t.label} ({counts[t.key] || 0})
+          </button>
+        ))}
+      </div>
 
       {loading && <LoadingSpinner label="Loading quote requests…" />}
       {!loading && error && <ErrorMessage message={error} />}
@@ -111,19 +172,20 @@ export default function ClientQuotes() {
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Quantity</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Tier</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Total</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">ETA</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {quotes.length === 0 && (
+              {visibleQuotes.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-cream-dim">
-                    No quote requests yet.
+                  <td colSpan={11} className="px-4 py-10 text-center text-cream-dim">
+                    No {tab} quote requests.
                   </td>
                 </tr>
               )}
-              {quotes.map((quote) => (
+              {visibleQuotes.map((quote) => (
                 <tr key={quote.id} className="hover:bg-panel-2">
                   <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(quote.created_at)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.name}</td>
@@ -135,6 +197,7 @@ export default function ClientQuotes() {
                   <td className="whitespace-nowrap px-4 py-3 text-cream">
                     {quote.tier === 2 ? `R${Number(quote.total || 0).toFixed(2)}` : '—'}
                   </td>
+                  <td className="px-4 py-3 text-cream-dim">{quote.eta || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-medium ${
@@ -144,13 +207,13 @@ export default function ClientQuotes() {
                       {quote.status}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex flex-col gap-2">
-                      {quote.tier === 2 && quote.status === 'pending' && (
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-2" style={{ minWidth: 180 }}>
+                      {quote.tier === 2 && quote.status === 'pending' && approvingId !== quote.id && (
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => handleAction(quote, 'approve')}
+                            onClick={() => startApproving(quote)}
                             disabled={pendingId === quote.id}
                             className="flex-1 rounded-lg border border-green-500/30 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/10 disabled:opacity-60"
                           >
@@ -158,12 +221,46 @@ export default function ClientQuotes() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAction(quote, 'reject')}
+                            onClick={() => handleReject(quote)}
                             disabled={pendingId === quote.id}
                             className="flex-1 rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-60"
                           >
                             Reject
                           </button>
+                        </div>
+                      )}
+
+                      {approvingId === quote.id && (
+                        <div className="rounded-lg border border-line bg-panel-2 p-2">
+                          <label className="mb-1 block text-[11px] font-medium text-cream-dim">
+                            ETA (sent to customer with the quote)
+                          </label>
+                          <input
+                            type="text"
+                            value={etaDraft}
+                            onChange={(e) => setEtaDraft(e.target.value)}
+                            placeholder="e.g. 7-10 working days"
+                            autoFocus
+                            className="w-full rounded-md border border-line bg-panel px-2 py-1 text-xs text-cream placeholder:text-grey focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => confirmApprove(quote)}
+                              disabled={pendingId === quote.id}
+                              className="flex-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-ink disabled:opacity-60"
+                            >
+                              {pendingId === quote.id ? 'Sending…' : 'Confirm & Send'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelApproving}
+                              disabled={pendingId === quote.id}
+                              className="rounded-md border border-line px-2 py-1 text-xs text-cream-dim hover:bg-panel disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       )}
 

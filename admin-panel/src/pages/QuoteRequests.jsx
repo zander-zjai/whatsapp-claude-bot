@@ -88,6 +88,7 @@ export default function QuoteRequests() {
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Quantity</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Tier</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Total</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">ETA</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">WhatsApp</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">PDF</th>
@@ -96,7 +97,7 @@ export default function QuoteRequests() {
             <tbody className="divide-y divide-line">
               {quotes.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-10 text-center text-cream-dim">
+                  <td colSpan={13} className="px-4 py-10 text-center text-cream-dim">
                     No quote requests yet.
                   </td>
                 </tr>
@@ -116,6 +117,7 @@ export default function QuoteRequests() {
                   <td className="whitespace-nowrap px-4 py-3 text-cream">
                     {quote.tier === 2 ? `R${Number(quote.total || 0).toFixed(2)}` : '—'}
                   </td>
+                  <td className="px-4 py-3 text-cream-dim">{quote.eta || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     {quote.tier === 2 ? (
                       <span

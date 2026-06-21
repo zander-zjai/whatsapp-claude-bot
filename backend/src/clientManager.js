@@ -36,6 +36,8 @@ const EDITABLE_FIELDS = [
   'last_invoice_date',
   'next_invoice_date',
   'onboarding_checklist',
+  'banking_details',
+  'payment_link_url',
 ];
 
 const REQUIRED_FIELDS = [
@@ -102,6 +104,8 @@ const CLIENT_PORTAL_SETTINGS_FIELDS = [
   'contact_person',
   'contact_email',
   'contact_phone',
+  'banking_details',
+  'payment_link_url',
 ];
 
 /**

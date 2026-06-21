@@ -5,11 +5,33 @@ const errorLogger = require('./errorLogger');
 const quoteManager = require('./quoteManager');
 const { sendWhatsAppDocument } = require('./whatsapp');
 
+/**
+ * Build the customer-facing caption that goes out with the PDF: validity,
+ * the owner-provided ETA (if set), and how to pay — a real payment link if
+ * the client has one configured, otherwise their EFT banking details as a
+ * fallback so there's always a concrete next step for the customer.
+ */
+function buildQuoteCaption(client, quote) {
+  const parts = [`Here's your quote, valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')}.`];
+
+  if (quote.eta) {
+    parts.push(`Estimated completion: ${quote.eta}.`);
+  }
+
+  if (client.payment_link_url) {
+    parts.push(`To go ahead, pay here: ${client.payment_link_url}`);
+  } else if (client.banking_details) {
+    parts.push(`To go ahead, pay via EFT:\n${client.banking_details}\nPlease send proof of payment once paid.`);
+  }
+
+  return parts.join(' ');
+}
+
 /** Send a generated PDF quote to the customer. Returns true on success. */
 async function sendQuotePdf(client, quote, pdfBuffer) {
   try {
     const filename = `Quote-${quote.id.slice(0, 8)}.pdf`;
-    const caption = `Here's your quote, valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')}.`;
+    const caption = buildQuoteCaption(client, quote);
     await sendWhatsAppDocument(client, quote.customer_number, pdfBuffer, filename, caption);
     return true;
   } catch (err) {
@@ -21,13 +43,17 @@ async function sendQuotePdf(client, quote, pdfBuffer) {
 }
 
 /**
- * Approve a pending Tier 2 quote: mark it approved, send the generated PDF
- * to the customer via WhatsApp, and mark it sent on success. Shared by the
+ * Approve a pending Tier 2 quote: record the owner-provided ETA, mark it
+ * approved, send the generated PDF (with ETA + payment instructions) to the
+ * customer via WhatsApp, and mark it sent on success. Shared by the
  * WhatsApp #approve command and the client portal's "Approve" button.
  *
  * @returns {Promise<{ ok: boolean, reason?: 'pdf_missing'|'send_failed' }>}
  */
-async function approveQuote(client, quote) {
+async function approveQuote(client, quote, eta) {
+  if (eta !== undefined) {
+    quoteManager.setQuoteEta(quote.id, eta);
+  }
   quoteManager.setQuoteStatus(quote.id, 'approved');
 
   const pdfBuffer = quoteManager.readPdfFile(quote.id);
@@ -35,7 +61,7 @@ async function approveQuote(client, quote) {
     return { ok: false, reason: 'pdf_missing' };
   }
 
-  const sent = await sendQuotePdf(client, quote, pdfBuffer);
+  const sent = await sendQuotePdf(client, quoteManager.getQuoteById(quote.id), pdfBuffer);
   if (!sent) {
     return { ok: false, reason: 'send_failed' };
   }

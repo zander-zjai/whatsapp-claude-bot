@@ -34,6 +34,8 @@ export default function ClientSettings() {
   const [botPersonality, setBotPersonality] = useState('Professional');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [businessHours, setBusinessHours] = useState(DEFAULT_BUSINESS_HOURS);
+  const [bankingDetails, setBankingDetails] = useState('');
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -51,6 +53,8 @@ export default function ClientSettings() {
         setBotPersonality(s.bot_personality || 'Professional');
         setSystemPrompt(s.system_prompt || '');
         setBusinessHours({ ...DEFAULT_BUSINESS_HOURS, ...(s.business_hours || {}) });
+        setBankingDetails(s.banking_details || '');
+        setPaymentLinkUrl(s.payment_link_url || '');
       })
       .catch((err) => !cancelled && setLoadError(getErrorMessage(err, 'Failed to load settings')))
       .finally(() => !cancelled && setLoading(false));
@@ -95,6 +99,8 @@ export default function ClientSettings() {
         bot_personality: botPersonality,
         system_prompt: systemPrompt,
         business_hours: businessHours,
+        banking_details: bankingDetails,
+        payment_link_url: paymentLinkUrl,
       };
       if (newPassword) {
         payload.current_password = currentPassword;
@@ -270,6 +276,42 @@ export default function ClientSettings() {
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-cream">Payment</h2>
+            <p className="mb-4 text-xs text-cream-dim">
+              Sent to the customer automatically when you approve a quote, alongside the PDF and
+              your ETA. If a payment link is set, it's used instead of the EFT details.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>Payment Link URL</label>
+                <input
+                  type="text"
+                  value={paymentLinkUrl}
+                  onChange={(e) => setPaymentLinkUrl(e.target.value)}
+                  placeholder="https://pay.yoco.com/..."
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-cream-dim">
+                  Leave blank until you've set up a payment provider (e.g. Yoco, PayFast).
+                </p>
+              </div>
+              <div>
+                <label className={labelClass}>EFT Banking Details</label>
+                <textarea
+                  value={bankingDetails}
+                  onChange={(e) => setBankingDetails(e.target.value)}
+                  rows={4}
+                  placeholder={'Bank: \nAccount name: \nAccount number: \nBranch code: \nReference: customer name'}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-cream-dim">
+                  Used as a fallback so customers can always pay, even without a payment link.
+                </p>
+              </div>
+            </div>
           </section>
 
           <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
