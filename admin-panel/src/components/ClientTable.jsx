@@ -52,7 +52,17 @@ export default function ClientTable({ clients, onToggleActive, onDelete }) {
           {clients.map((client) => (
             <tr key={client.id} className="hover:bg-panel-2">
               <td className="px-4 py-3">
-                <p className="font-medium text-cream">{client.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-cream">{client.name}</p>
+                  {client.usage_warning && (
+                    <span
+                      title="Over 80% of monthly interaction cap"
+                      className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                    >
+                      ⚠ Usage
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-grey">{client.contact_person}</p>
               </td>
               <td className="px-4 py-3">

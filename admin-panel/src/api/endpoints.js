@@ -41,6 +41,12 @@ export const setConversationHandover = (clientId, customerNumber, active) =>
     .post('/admin/conversations/handover', { client_id: clientId, customer_number: customerNumber, active })
     .then((r) => r.data.conversation);
 
+// --- Usage & cost tracking ---
+export const getClientUsage = (id) => apiClient.get(`/admin/clients/${id}/usage`).then((r) => r.data);
+
+export const getUsageSummary = () =>
+  apiClient.get('/admin/usage/summary').then((r) => r.data.summary);
+
 // --- Quote requests ---
 export const getQuotes = (params = {}) =>
   apiClient.get('/admin/quotes', { params }).then((r) => r.data.quotes);

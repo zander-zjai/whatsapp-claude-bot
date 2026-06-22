@@ -5,6 +5,7 @@ const { log, logError } = require('./logger');
 const settingsManager = require('./settingsManager');
 const quoteManager = require('./quoteManager');
 const bookingManager = require('./bookingManager');
+const usageManager = require('./usageManager');
 
 const MODEL = 'claude-sonnet-4-5';
 const MAX_TOKENS = 1024;
@@ -128,6 +129,13 @@ async function getClaudeReply(client, history, options = {}) {
     system: buildSystemPrompt(client, options),
     messages,
   });
+
+  if (response.usage) {
+    usageManager.recordUsage(client.id, {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    });
+  }
 
   // Concatenate all text blocks from the response.
   const text = (response.content || [])

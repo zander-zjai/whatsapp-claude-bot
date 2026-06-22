@@ -44,6 +44,7 @@ const EDITABLE_FIELDS = [
   'google_refresh_token',
   'google_calendar_id',
   'team_members',
+  'monthly_interaction_cap',
 ];
 
 const REQUIRED_FIELDS = [
@@ -103,6 +104,7 @@ const DEFAULTS = {
   google_refresh_token: '',
   google_calendar_id: '',
   team_members: [],
+  monthly_interaction_cap: 750,
 };
 
 // Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
@@ -291,6 +293,9 @@ function addClient(data) {
     monthly_message_limit: Number(
       picked.monthly_message_limit ?? DEFAULTS.monthly_message_limit
     ),
+    monthly_interaction_cap: Number(
+      picked.monthly_interaction_cap ?? DEFAULTS.monthly_interaction_cap
+    ),
     use_platform_key: Boolean(picked.use_platform_key),
     active: picked.active !== undefined ? Boolean(picked.active) : DEFAULTS.active,
     quote_requests_enabled: Boolean(picked.quote_requests_enabled),
@@ -327,6 +332,9 @@ function updateClient(id, data) {
   }
   if (picked.monthly_message_limit !== undefined) {
     picked.monthly_message_limit = Number(picked.monthly_message_limit);
+  }
+  if (picked.monthly_interaction_cap !== undefined) {
+    picked.monthly_interaction_cap = Number(picked.monthly_interaction_cap);
   }
   if (picked.use_platform_key !== undefined) {
     picked.use_platform_key = Boolean(picked.use_platform_key);
@@ -377,7 +385,15 @@ function updateClient(id, data) {
  * credentials and the portal password hash.
  */
 function sanitizeClientForPortal(client) {
-  const { whatsapp_token, claude_api_key, client_password, google_client_secret, google_refresh_token, ...safe } = client;
+  const {
+    whatsapp_token,
+    claude_api_key,
+    client_password,
+    google_client_secret,
+    google_refresh_token,
+    monthly_interaction_cap,
+    ...safe
+  } = client;
   return safe;
 }
 

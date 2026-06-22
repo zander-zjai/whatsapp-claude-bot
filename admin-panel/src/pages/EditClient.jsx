@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ClientForm from '../components/ClientForm';
+import UsageSection from '../components/UsageSection';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import { getClient, updateClient } from '../api/endpoints';
@@ -117,6 +118,7 @@ export default function EditClient() {
               setClient((prev) => ({ ...prev, onboarding_checklist }))
             }
           />
+          <UsageSection clientId={client.id} />
           <ClientForm
             initialValues={client}
             onSubmit={handleSubmit}

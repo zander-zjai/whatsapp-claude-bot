@@ -4,11 +4,12 @@ import StatsCard from '../components/StatsCard';
 import MessageChart from '../components/MessageChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
-import { getStats, getHealth } from '../api/endpoints';
+import { getStats, getHealth, getUsageSummary } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [usageSummary, setUsageSummary] = useState(null);
   const [serverOnline, setServerOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,6 +24,13 @@ export default function Dashboard() {
         const [statsData] = await Promise.all([getStats()]);
         if (cancelled) return;
         setStats(statsData);
+
+        try {
+          const summary = await getUsageSummary();
+          if (!cancelled) setUsageSummary(summary);
+        } catch {
+          // Usage summary is a nice-to-have — don't block the rest of the dashboard on it.
+        }
 
         try {
           await getHealth();
@@ -60,6 +68,13 @@ export default function Dashboard() {
               status={serverOnline ? 'online' : 'offline'}
               icon="🖥️"
             />
+            {usageSummary && (
+              <StatsCard
+                label="Est. Anthropic Spend This Month"
+                value={`R${usageSummary.estimated_cost_zar.toFixed(2)}`}
+                icon="💸"
+              />
+            )}
           </div>
 
           <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">

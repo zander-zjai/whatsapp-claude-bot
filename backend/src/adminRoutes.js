@@ -13,6 +13,7 @@ const auth = require('./auth');
 const clientAuth = require('./clientAuth');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
+const usageManager = require('./usageManager');
 
 const router = express.Router();
 
@@ -53,14 +54,24 @@ router.use(auth.requireAuth);
 // Clients CRUD
 // ------------------------------------------------------------------
 
-/** GET /admin/clients — list all clients with today's message count. */
+const USAGE_WARNING_THRESHOLD = 0.8;
+
+/** GET /admin/clients — list all clients with today's message count + usage-cap warning flag. */
 router.get('/clients', (req, res) => {
   const { messages_today_by_client: byClient } = logsManager.getStats();
 
-  const clients = clientManager.getAllClients().map((c) => ({
-    ...c,
-    messages_today: byClient[c.id] || 0,
-  }));
+  const clients = clientManager.getAllClients().map((c) => {
+    const usage = usageManager.getMonthlyUsageForClient(c.id);
+    const cap = Number(c.monthly_interaction_cap) || 0;
+    const usage_percentage = cap > 0 ? (usage.message_count / cap) * 100 : 0;
+
+    return {
+      ...c,
+      messages_today: byClient[c.id] || 0,
+      usage_percentage,
+      usage_warning: usage_percentage >= USAGE_WARNING_THRESHOLD * 100,
+    };
+  });
 
   res.json({ clients });
 });
@@ -163,6 +174,34 @@ router.get('/clients/:id/logs', (req, res) => {
   });
 
   res.json({ logs });
+});
+
+// ------------------------------------------------------------------
+// Usage & cost tracking (Claude API spend, not billing)
+// ------------------------------------------------------------------
+
+/** GET /admin/clients/:id/usage — this client's current-month usage + cap. */
+router.get('/clients/:id/usage', (req, res) => {
+  const client = clientManager.getClientById(req.params.id);
+  if (!client) {
+    return res.status(404).json({ error: 'Client not found' });
+  }
+
+  const usage = usageManager.getMonthlyUsageForClient(client.id);
+  const cap = Number(client.monthly_interaction_cap) || 0;
+  const usage_percentage = cap > 0 ? (usage.message_count / cap) * 100 : 0;
+
+  res.json({
+    usage,
+    monthly_interaction_cap: cap,
+    usage_percentage,
+    usage_warning: usage_percentage >= USAGE_WARNING_THRESHOLD * 100,
+  });
+});
+
+/** GET /admin/usage/summary — total estimated Anthropic spend this month across every client. */
+router.get('/usage/summary', (req, res) => {
+  res.json({ summary: usageManager.getMonthlySummary() });
 });
 
 // ------------------------------------------------------------------

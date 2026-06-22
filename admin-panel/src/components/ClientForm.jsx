@@ -14,6 +14,7 @@ export const DEFAULT_CLIENT_VALUES = {
   claude_api_key: '',
   use_platform_key: false,
   monthly_message_limit: 1000,
+  monthly_interaction_cap: 750,
   bot_personality: 'Professional',
   bot_name: '',
   system_prompt: '',
@@ -102,6 +103,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
     onSubmit({
       ...values,
       monthly_message_limit: Number(values.monthly_message_limit) || 0,
+      monthly_interaction_cap: Number(values.monthly_interaction_cap) || 0,
       quote_tier: Number(values.quote_tier) === 2 ? 2 : 1,
       monthly_fee: Number(values.monthly_fee) || 0,
       price_list: values.price_list
@@ -287,6 +289,20 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
               min="0"
               className={inputClass}
             />
+          </div>
+          <div>
+            <label className={labelClass}>Monthly Interaction Cap (cost-warning threshold)</label>
+            <input
+              type="number"
+              name="monthly_interaction_cap"
+              value={values.monthly_interaction_cap}
+              onChange={handleChange}
+              min="0"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-cream-dim">
+              Internal soft cap for the Usage tab's 80% cost warning — not shown to the client.
+            </p>
           </div>
         </div>
 
