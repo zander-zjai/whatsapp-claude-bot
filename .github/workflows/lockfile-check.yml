@@ -1,0 +1,17 @@
+name: Lockfile check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  npm-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Verify package-lock.json is in sync with package.json
+        working-directory: backend
+        run: npm ci
