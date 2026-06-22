@@ -151,8 +151,11 @@ function handleWebhook(req, res) {
 
   if (parsed.ignored) {
     log(
-      `Ignored non-text message (type="${parsed.type}") from ${parsed.from}`
+      `Unhandled message type ("${parsed.type}") from ${parsed.from} — sending generic fallback reply`
     );
+    processUnhandledMessage(parsed).catch((err) => {
+      logError('Unhandled error while processing unrecognized message type:', err);
+    });
     return;
   }
 
@@ -169,11 +172,40 @@ function handleWebhook(req, res) {
   });
 }
 
+const NO_CAPTION_REPLY = "Got it, thanks! I've got your image/file — someone from our team will take a look. Let me know if there's anything else I can help with in the meantime.";
+const UNHANDLED_TYPE_REPLY = "I've got your message — I can't quite open that type of file here, but let me know in writing what you need and I'll help, or someone from our team will follow up.";
+
+/**
+ * Safety net for any message type we don't have specific handling for
+ * (audio notes, stickers, location pins, contacts, etc.) — Zara must never
+ * go silent on an inbound message, regardless of type.
+ */
+async function processUnhandledMessage({ from, phoneNumberId, type }) {
+  const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
+  if (!client) {
+    logError(`No active client matched phone_number_id="${phoneNumberId}". Unhandled message (type="${type}") from ${maskPhone(from)} dropped.`);
+    return;
+  }
+
+  const sent = await sendReply(client, from, UNHANDLED_TYPE_REPLY);
+  logsManager.addLog({
+    client_id: client.id,
+    client_name: client.name,
+    customer_number: from,
+    customer_message: `(sent an unsupported message type: ${type})`,
+    bot_reply: UNHANDLED_TYPE_REPLY,
+    response_time_ms: 0,
+    status: sent ? 'success' : 'failed',
+  });
+}
+
 /**
  * Download and store an inbound image/document (e.g. a design file the
  * customer sent), associated with their number for later lookup by a
- * quote's Attachments tab. Deliberately doesn't involve Claude — a bare
- * attachment with no question doesn't need a conversational reply in v1.
+ * quote's Attachments tab. Zara must never go silent on this: a caption
+ * routes through the normal Claude pipeline (with a note that an
+ * attachment came in, since she can't see it), and a bare attachment with
+ * no caption gets a generic acknowledgment reply.
  */
 async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, caption }) {
   const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
@@ -184,11 +216,31 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
 
   log(`[${client.name}] Incoming media <- ${maskPhone(from)} (mime=${mimeType})`);
 
+  // Best-effort: a storage failure should never block the customer-facing
+  // reply below.
   try {
     await mediaManager.captureInboundMedia(client, { customerNumber: from, mediaId, mimeType, caption });
   } catch (err) {
     errorLogger.logErrorToFile(`[${client.name}] Failed to capture inbound media`, err);
   }
+
+  const trimmedCaption = String(caption || '').trim();
+
+  if (trimmedCaption) {
+    await processMessage({ from, phoneNumberId, text: trimmedCaption, hasAttachment: true });
+    return;
+  }
+
+  const sent = await sendReply(client, from, NO_CAPTION_REPLY);
+  logsManager.addLog({
+    client_id: client.id,
+    client_name: client.name,
+    customer_number: from,
+    customer_message: `(sent a ${mimeType || 'file'} attachment, no caption)`,
+    bot_reply: NO_CAPTION_REPLY,
+    response_time_ms: 0,
+    status: sent ? 'success' : 'failed',
+  });
 }
 
 /**
@@ -563,7 +615,7 @@ async function handleBookingAssignment(client, bookingId, teamMemberName) {
  *
  * Every processed message is recorded to logs.json for the admin panel.
  */
-async function processMessage({ from, phoneNumberId, text }) {
+async function processMessage({ from, phoneNumberId, text, hasAttachment = false }) {
   const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
 
   if (!client) {
@@ -670,6 +722,7 @@ async function processMessage({ from, phoneNumberId, text }) {
       returningCustomerName,
       quoteRequestsEnabled: !!client.quote_requests_enabled,
       quoteStatusSummary: quoteManager.describeQuoteForCustomer(client.id, from),
+      hasAttachment,
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);

@@ -70,6 +70,12 @@ function buildSystemPrompt(client, options = {}) {
     parts.push(bookingInstructions);
   }
 
+  if (options.hasAttachment) {
+    parts.push(
+      `The customer's latest message also included an image or document attachment. You cannot see its contents, so acknowledge that you received it (e.g. "got your image/file") and answer any text question they asked alongside it. Let them know the team will review the attachment directly.`
+    );
+  }
+
   if (options.quoteStatusSummary) {
     parts.push(
       `QUOTE STATUS: ${options.quoteStatusSummary} If the customer asks about the status of their quote or order, answer directly using this information — you don't need to involve the owner.`
