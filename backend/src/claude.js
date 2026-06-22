@@ -72,7 +72,7 @@ function buildSystemPrompt(client, options = {}) {
 
   if (options.hasAttachment) {
     parts.push(
-      `The customer's latest message also included an image or document attachment. You cannot see its contents, so acknowledge that you received it (e.g. "got your image/file") and answer any text question they asked alongside it. Let them know the team will review the attachment directly.`
+      `The customer's latest message also included a document attachment (e.g. a PDF). You cannot see its contents, so acknowledge that you received it (e.g. "got your file") and answer any text question they asked alongside it. Let them know the team will review the attachment directly.`
     );
   }
 
@@ -91,16 +91,42 @@ function buildSystemPrompt(client, options = {}) {
  * @param {object}  client   - The matched client config (system_prompt, claude_api_key, name).
  * @param {Array}   history  - Prior messages [{ role, content }, ...] (already includes the new user msg).
  * @param {object}  [options] - See buildSystemPrompt.
+ * @param {string}  [options.imageBase64] - Base64 image data for the current
+ *   turn (vision). Swapped into the last user message's content as a
+ *   multimodal block for this API call only — never written back into
+ *   `history`/memory, so later turns stay plain text and don't keep
+ *   re-billing image tokens on every follow-up message.
+ * @param {string}  [options.imageMimeType] - Media type for imageBase64
+ *   (image/jpeg, image/png, or image/webp).
  * @returns {Promise<string>} Claude's text response.
  */
 async function getClaudeReply(client, history, options = {}) {
   const anthropic = getAnthropicClient(resolveApiKey(client));
 
+  let messages = history;
+  if (options.imageBase64) {
+    messages = history.slice();
+    const lastIndex = messages.length - 1;
+    const last = messages[lastIndex];
+    if (last && last.role === 'user') {
+      messages[lastIndex] = {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: options.imageMimeType, data: options.imageBase64 },
+          },
+          { type: 'text', text: typeof last.content === 'string' ? last.content : '' },
+        ],
+      };
+    }
+  }
+
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     system: buildSystemPrompt(client, options),
-    messages: history,
+    messages,
   });
 
   // Concatenate all text blocks from the response.

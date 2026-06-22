@@ -46,7 +46,7 @@ function extensionForMime(mimeType) {
  * within minutes, so this must be called immediately on message receipt —
  * never lazily later.
  *
- * @returns {Promise<{ filePath: string, mimeType: string }>}
+ * @returns {Promise<{ filePath: string, mimeType: string, buffer: Buffer }>}
  */
 async function downloadAndStoreMedia(client, mediaId, mimeType) {
   const metaRes = await axios.get(`https://graph.facebook.com/${GRAPH_API_VERSION}/${mediaId}`, {
@@ -63,14 +63,16 @@ async function downloadAndStoreMedia(client, mediaId, mimeType) {
     timeout: 30000,
   });
 
+  const buffer = Buffer.from(fileRes.data);
+
   const dir = dataPath(path.join(MEDIA_DIR, client.id));
   fs.mkdirSync(dir, { recursive: true });
 
   const filename = `${crypto.randomUUID()}.${extensionForMime(resolvedMimeType)}`;
   const filePath = path.join(dir, filename);
-  fs.writeFileSync(filePath, fileRes.data);
+  fs.writeFileSync(filePath, buffer);
 
-  return { filePath, mimeType: resolvedMimeType };
+  return { filePath, mimeType: resolvedMimeType, buffer };
 }
 
 /**
@@ -122,17 +124,23 @@ function getAttachmentById(id) {
   return attachments.find((a) => a.id === id);
 }
 
-/** Download a media object and record its metadata in one call. Logs and re-throws on failure. */
+/**
+ * Download a media object and record its metadata in one call. The returned
+ * `base64` is transient (for an immediate Claude vision call) — it is never
+ * persisted to attachments.json, only the file path and metadata are.
+ * Logs and re-throws on failure.
+ */
 async function captureInboundMedia(client, { customerNumber, mediaId, mimeType, caption }) {
   try {
-    const { filePath, mimeType: resolvedMimeType } = await downloadAndStoreMedia(client, mediaId, mimeType);
-    return recordAttachment({
+    const { filePath, mimeType: resolvedMimeType, buffer } = await downloadAndStoreMedia(client, mediaId, mimeType);
+    const record = recordAttachment({
       client_id: client.id,
       customer_number: customerNumber,
       file_path: filePath,
       mime_type: resolvedMimeType,
       caption: caption || '',
     });
+    return { ...record, base64: buffer.toString('base64') };
   } catch (err) {
     logError(`[${client.name}] Failed to capture inbound media:`, err.message);
     throw err;

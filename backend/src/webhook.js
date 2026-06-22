@@ -175,6 +175,10 @@ function handleWebhook(req, res) {
 const NO_CAPTION_REPLY = "Got it, thanks! I've got your image/file — someone from our team will take a look. Let me know if there's anything else I can help with in the meantime.";
 const UNHANDLED_TYPE_REPLY = "I've got your message — I can't quite open that type of file here, but let me know in writing what you need and I'll help, or someone from our team will follow up.";
 
+// Claude vision supports these image types directly; documents (PDFs etc.)
+// stay on the caption-only fallback path since they aren't image input.
+const VISION_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 /**
  * Safety net for any message type we don't have specific handling for
  * (audio notes, stickers, location pins, contacts, etc.) — Zara must never
@@ -202,12 +206,14 @@ async function processUnhandledMessage({ from, phoneNumberId, type }) {
 /**
  * Download and store an inbound image/document (e.g. a design file the
  * customer sent), associated with their number for later lookup by a
- * quote's Attachments tab. Zara must never go silent on this: a caption
- * routes through the normal Claude pipeline (with a note that an
- * attachment came in, since she can't see it), and a bare attachment with
- * no caption gets a generic acknowledgment reply.
+ * quote's Attachments tab. Zara must never go silent on this:
+ *  - Images (jpeg/png/webp) go through real Claude vision, so she can
+ *    actually see and reason about logos/designs/reference photos.
+ *  - Documents (PDFs etc.) aren't vision input — a caption routes through
+ *    the normal Claude pipeline with a note that she can't see the file
+ *    itself; no caption gets a generic acknowledgment reply.
  */
-async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, caption }) {
+async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, caption, mediaType }) {
   const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
   if (!client) {
     logError(`No active client matched phone_number_id="${phoneNumberId}". Media from ${maskPhone(from)} dropped.`);
@@ -218,13 +224,26 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
 
   // Best-effort: a storage failure should never block the customer-facing
   // reply below.
+  let captured = null;
   try {
-    await mediaManager.captureInboundMedia(client, { customerNumber: from, mediaId, mimeType, caption });
+    captured = await mediaManager.captureInboundMedia(client, { customerNumber: from, mediaId, mimeType, caption });
   } catch (err) {
     errorLogger.logErrorToFile(`[${client.name}] Failed to capture inbound media`, err);
   }
 
   const trimmedCaption = String(caption || '').trim();
+  const canSeeImage = mediaType === 'image' && captured && VISION_MIME_TYPES.has(captured.mime_type);
+
+  if (canSeeImage) {
+    await processMessage({
+      from,
+      phoneNumberId,
+      text: trimmedCaption || "Here's an image — take a look and let me know what you think.",
+      imageBase64: captured.base64,
+      imageMimeType: captured.mime_type,
+    });
+    return;
+  }
 
   if (trimmedCaption) {
     await processMessage({ from, phoneNumberId, text: trimmedCaption, hasAttachment: true });
@@ -615,7 +634,7 @@ async function handleBookingAssignment(client, bookingId, teamMemberName) {
  *
  * Every processed message is recorded to logs.json for the admin panel.
  */
-async function processMessage({ from, phoneNumberId, text, hasAttachment = false }) {
+async function processMessage({ from, phoneNumberId, text, hasAttachment = false, imageBase64 = null, imageMimeType = null }) {
   const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
 
   if (!client) {
@@ -723,6 +742,8 @@ async function processMessage({ from, phoneNumberId, text, hasAttachment = false
       quoteRequestsEnabled: !!client.quote_requests_enabled,
       quoteStatusSummary: quoteManager.describeQuoteForCustomer(client.id, from),
       hasAttachment,
+      imageBase64,
+      imageMimeType,
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);
