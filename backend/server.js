@@ -23,6 +23,8 @@ const logsManager = require('./src/logsManager');
 const conversationManager = require('./src/conversationManager');
 const quoteManager = require('./src/quoteManager');
 const quoteReminders = require('./src/quoteReminders');
+const bookingsManager = require('./src/bookingsManager');
+const mediaManager = require('./src/mediaManager');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
 const clientPortalRoutes = require('./src/clientPortalRoutes');
@@ -45,6 +47,8 @@ settingsManager.loadSettings();
 logsManager.loadLogs();
 conversationManager.load();
 quoteManager.load();
+bookingsManager.load();
+mediaManager.load();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
 errorLogger.cleanupOldLogs();

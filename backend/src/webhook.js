@@ -13,6 +13,10 @@ const { maskPhone, normalizeNumber } = require('./phone');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
 const quoteActions = require('./quoteActions');
+const bookingManager = require('./bookingManager');
+const bookingsManager = require('./bookingsManager');
+const googleCalendarClient = require('./googleCalendarClient');
+const mediaManager = require('./mediaManager');
 const leadTagger = require('./leadTagger');
 const pdfGenerator = require('./pdfGenerator');
 const businessHours = require('./businessHours');
@@ -94,7 +98,24 @@ function parseIncomingMessage(body) {
     const phoneNumberId = value.metadata && value.metadata.phone_number_id;
     const from = message.from; // customer's WhatsApp number
 
-    // Only handle text messages. Ignore everything else silently.
+    // Images/documents (e.g. design files) are captured as attachments
+    // rather than passed to Claude — see processMessage's media branch.
+    if (message.type === 'image' || message.type === 'document') {
+      const media = message[message.type];
+      return {
+        ignored: false,
+        isMedia: true,
+        mediaType: message.type,
+        mediaId: media && media.id,
+        mimeType: media && media.mime_type,
+        caption: media && media.caption,
+        from,
+        phoneNumberId,
+        messageId: message.id,
+      };
+    }
+
+    // Only handle text messages beyond this point. Ignore everything else silently.
     if (message.type !== 'text') {
       return { ignored: true, type: message.type, from, phoneNumberId };
     }
@@ -135,10 +156,39 @@ function handleWebhook(req, res) {
     return;
   }
 
+  if (parsed.isMedia) {
+    processInboundMedia(parsed).catch((err) => {
+      logError('Unhandled error while processing inbound media:', err);
+    });
+    return;
+  }
+
   // Process in the background; never block the HTTP response on Claude.
   processMessage(parsed).catch((err) => {
     logError('Unhandled error while processing message:', err);
   });
+}
+
+/**
+ * Download and store an inbound image/document (e.g. a design file the
+ * customer sent), associated with their number for later lookup by a
+ * quote's Attachments tab. Deliberately doesn't involve Claude — a bare
+ * attachment with no question doesn't need a conversational reply in v1.
+ */
+async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, caption }) {
+  const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
+  if (!client) {
+    logError(`No active client matched phone_number_id="${phoneNumberId}". Media from ${maskPhone(from)} dropped.`);
+    return;
+  }
+
+  log(`[${client.name}] Incoming media <- ${maskPhone(from)} (mime=${mimeType})`);
+
+  try {
+    await mediaManager.captureInboundMedia(client, { customerNumber: from, mediaId, mimeType, caption });
+  } catch (err) {
+    errorLogger.logErrorToFile(`[${client.name}] Failed to capture inbound media`, err);
+  }
 }
 
 /**
@@ -193,6 +243,11 @@ async function handleOwnerCommand(client, from, text) {
 
   if (command.command === 'approve' || command.command === 'reject') {
     await handleQuoteDecision(client, command.command);
+    return true;
+  }
+
+  if (command.command === 'assign') {
+    await handleBookingAssignment(client, command.bookingId, command.teamMemberName);
     return true;
   }
 
@@ -310,6 +365,112 @@ async function handleTier2Quote(client, from, quote, { items, total }, score) {
 }
 
 /**
+ * Build start/end ISO datetime strings (with explicit +02:00 offset) for a
+ * booking, from a "YYYY-MM-DD" date + "HH:MM" time + duration. South Africa
+ * has no DST, so a fixed +02:00 offset is always correct here.
+ */
+function buildBookingWindow(date, time, durationMinutes) {
+  const startISO = `${date}T${time}:00+02:00`;
+  const start = new Date(startISO);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  const shiftedEnd = new Date(end.getTime() + 2 * 60 * 60 * 1000);
+  const endISO = `${shiftedEnd.toISOString().slice(0, 19)}+02:00`;
+
+  return { startISO, endISO };
+}
+
+/**
+ * Handle a [[BOOKING_REQUEST]] extracted from Claude's reply: check the
+ * client's Google Calendar for availability, create the event if free, and
+ * notify the customer + owner. Never throws — all failures are logged and
+ * degrade to a customer-facing fallback message.
+ */
+async function handleBookingRequest(client, from, booking) {
+  const window = buildBookingWindow(booking.date, booking.time, booking.duration_minutes);
+
+  if (!window) {
+    logError(`[${client.name}] Booking request had an unparseable date/time: ${booking.date} ${booking.time}`);
+    return;
+  }
+
+  const calendarCreds = {
+    clientId: client.google_client_id,
+    clientSecret: client.google_client_secret,
+    refreshToken: client.google_refresh_token,
+    calendarId: client.google_calendar_id || 'primary',
+  };
+
+  try {
+    const { busy } = await googleCalendarClient.checkAvailability({
+      ...calendarCreds,
+      startISO: window.startISO,
+      endISO: window.endISO,
+    });
+
+    if (busy) {
+      await sendReply(
+        client,
+        from,
+        `That time's actually taken — could you give me another day or time that works for you?`
+      );
+      return;
+    }
+
+    const event = await googleCalendarClient.createEvent({
+      ...calendarCreds,
+      summary: `${client.name} — ${booking.name} (unassigned)`,
+      description: `Contact: ${booking.contact_number}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
+      startISO: window.startISO,
+      endISO: window.endISO,
+    });
+
+    const record = bookingsManager.addBooking({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      name: booking.name,
+      contact_number: booking.contact_number,
+      date: booking.date,
+      time: booking.time,
+      notes: booking.notes,
+      calendar_event_id: event.id,
+    });
+
+    await sendReply(
+      client,
+      from,
+      `You're booked in for ${booking.date} at ${booking.time}. See you then!`
+    );
+
+    const teamHint = Array.isArray(client.team_members) && client.team_members.length > 0
+      ? ` Reply #assign ${record.id} <name> to assign it to ${client.team_members.map((m) => m.name).join('/')}.`
+      : '';
+
+    await notifyOwner(
+      client,
+      `New booking — ${booking.name}, ${booking.contact_number}, ${booking.date} ${booking.time}. Unassigned on the calendar.${teamHint}`,
+      { email: true, emailSubject: `New booking — ${booking.name}` }
+    );
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Google Calendar booking failed:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Google Calendar booking failed`, err);
+
+    await sendReply(
+      client,
+      from,
+      `Sorry, I couldn't get that booked just now — ${client.name} will confirm with you directly shortly.`
+    );
+    await notifyOwner(
+      client,
+      `Booking attempt failed for ${booking.name} (${booking.contact_number}), requested ${booking.date} ${booking.time} — calendar error, please follow up manually: ${detail}`
+    );
+  }
+}
+
+/**
  * Handle an owner's #approve/#reject reply for the most recent pending
  * Tier 2 quote. #approve sends the PDF to the customer; #reject leaves it
  * for the owner to handle manually.
@@ -342,6 +503,52 @@ async function handleQuoteDecision(client, decision) {
       client,
       `Quote for ${pending.name} marked as rejected. Please follow up with them manually.`
     );
+  }
+}
+
+/**
+ * Handle an owner's #assign <booking_id> <team member name> command: look up
+ * the booking and the matching team member (case-insensitive), recolor the
+ * calendar event and update its description to reflect the assignment, and
+ * mark the booking record assigned.
+ */
+async function handleBookingAssignment(client, bookingId, teamMemberName) {
+  const booking = bookingsManager.getBookingById(bookingId);
+  if (!booking || booking.client_id !== client.id) {
+    await notifyOwner(client, `No booking found with id ${bookingId}.`);
+    return;
+  }
+
+  const teamMembers = Array.isArray(client.team_members) ? client.team_members : [];
+  const teamMember = teamMembers.find(
+    (m) => m.name.toLowerCase() === teamMemberName.toLowerCase()
+  );
+
+  if (!teamMember) {
+    const known = teamMembers.map((m) => m.name).join(', ') || '(none configured)';
+    await notifyOwner(client, `"${teamMemberName}" isn't a known team member. Known: ${known}.`);
+    return;
+  }
+
+  try {
+    await googleCalendarClient.updateEvent({
+      clientId: client.google_client_id,
+      clientSecret: client.google_client_secret,
+      refreshToken: client.google_refresh_token,
+      calendarId: client.google_calendar_id || 'primary',
+      eventId: booking.calendar_event_id,
+      colorId: teamMember.color_id,
+      description: `Contact: ${booking.contact_number}${booking.notes ? `\nNotes: ${booking.notes}` : ''}\nAssigned to: ${teamMember.name}`,
+    });
+
+    bookingsManager.assignBooking(bookingId, teamMember.name);
+
+    await notifyOwner(client, `Booking for ${booking.name} assigned to ${teamMember.name}.`);
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Failed to assign booking ${bookingId}:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Failed to assign booking ${bookingId}`, err);
+    await notifyOwner(client, `Couldn't update the calendar for that assignment — please update it manually in Google Calendar.`);
   }
 }
 
@@ -456,6 +663,7 @@ async function processMessage({ from, phoneNumberId, text }) {
   let reply;
   let status = 'success';
   let quote = null;
+  let booking = null;
 
   try {
     const rawReply = await getClaudeReply(client, history, {
@@ -468,7 +676,11 @@ async function processMessage({ from, phoneNumberId, text }) {
     reply = extracted.text;
     quote = extracted.quote;
 
-    // Persist the cleaned reply (marker stripped) so it's part of the
+    const bookingExtracted = bookingManager.extractBookingRequest(reply);
+    reply = bookingExtracted.text;
+    booking = bookingExtracted.booking;
+
+    // Persist the cleaned reply (markers stripped) so it's part of the
     // next turn's context.
     memory.addMessage(client.id, from, 'assistant', reply);
   } catch (err) {
@@ -518,6 +730,10 @@ async function processMessage({ from, phoneNumberId, text }) {
         emailSubject: `New quote request — ${score.temperature.toUpperCase()}`,
       });
     }
+  }
+
+  if (booking && client.google_calendar_enabled) {
+    await handleBookingRequest(client, from, booking);
   }
 
   logsManager.addLog({

@@ -29,11 +29,21 @@ export const setClientConversationPriority = (customerNumber, priority) =>
 // --- Quote requests ---
 export const getClientQuotes = () => clientPortalApi.get('/client/quotes').then((r) => r.data.quotes);
 
+export const getClientQuote = (id) => clientPortalApi.get(`/client/quotes/${id}`).then((r) => r.data.quote);
+
 export const updateClientQuote = (id, data) =>
   clientPortalApi.patch(`/client/quotes/${id}`, data).then((r) => r.data.quote);
 
 export const getClientQuotePdfBlob = (id) =>
   clientPortalApi.get(`/client/quotes/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data);
+
+export const getClientQuoteAttachments = (id) =>
+  clientPortalApi.get(`/client/quotes/${id}/attachments`).then((r) => r.data.attachments);
+
+// Attachment files require the client's auth header, so they're fetched as
+// blobs (like the PDF download) rather than used directly as <img src>.
+export const getClientAttachmentBlob = (attachmentId) =>
+  clientPortalApi.get(`/client/attachments/${attachmentId}/file`, { responseType: 'blob' }).then((r) => r.data);
 
 // --- Price list (Tier 2 only) ---
 export const getClientPriceList = () => clientPortalApi.get('/client/pricelist').then((r) => r.data);

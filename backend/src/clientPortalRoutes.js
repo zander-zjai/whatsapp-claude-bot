@@ -10,6 +10,7 @@ const conversationManager = require('./conversationManager');
 const logsManager = require('./logsManager');
 const quoteManager = require('./quoteManager');
 const quoteActions = require('./quoteActions');
+const mediaManager = require('./mediaManager');
 
 const router = express.Router();
 
@@ -192,6 +193,66 @@ router.get('/quotes', (req, res) => {
   res.json({ quotes });
 });
 
+/** GET /client/quotes/:id — single quote, for the quote detail view. */
+router.get('/quotes/:id', (req, res) => {
+  const quote = quoteManager.getQuoteById(req.params.id);
+  if (!quote || quote.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Quote not found' });
+  }
+  res.json({ quote });
+});
+
+/**
+ * GET /client/quotes/:id/attachments — design files/images this customer
+ * sent around the time of this quote (window: created_at ± 48h). Media
+ * isn't linked to a specific quote at capture time, so this is a heuristic
+ * association by customer number + timestamp, not an exact link.
+ */
+const ATTACHMENT_WINDOW_HOURS = 48;
+
+router.get('/quotes/:id/attachments', (req, res) => {
+  const quote = quoteManager.getQuoteById(req.params.id);
+  if (!quote || quote.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Quote not found' });
+  }
+
+  const createdAt = new Date(quote.created_at).getTime();
+  const sinceISO = new Date(createdAt - ATTACHMENT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+  const untilISO = new Date(createdAt + ATTACHMENT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+
+  const attachments = mediaManager.getAttachmentsForCustomerInWindow(
+    req.clientId,
+    quote.customer_number,
+    sinceISO,
+    untilISO
+  );
+
+  res.json({
+    attachments: attachments.map((a) => ({
+      id: a.id,
+      mime_type: a.mime_type,
+      caption: a.caption,
+      created_at: a.created_at,
+      url: `/client/attachments/${a.id}/file`,
+    })),
+  });
+});
+
+/** GET /client/attachments/:id/file — stream a stored attachment file. */
+router.get('/attachments/:id/file', (req, res) => {
+  const attachment = mediaManager.getAttachmentById(req.params.id);
+  if (!attachment || attachment.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Attachment not found' });
+  }
+
+  if (!fs.existsSync(attachment.file_path)) {
+    return res.status(404).json({ error: 'File not available' });
+  }
+
+  res.setHeader('Content-Type', attachment.mime_type || 'application/octet-stream');
+  fs.createReadStream(attachment.file_path).pipe(res);
+});
+
 /**
  * PATCH /client/quotes/:id — update a quote.
  * - { action: 'approve' | 'reject' } — Tier 2 only, while status is 'pending'.
@@ -205,7 +266,12 @@ router.patch('/quotes/:id', async (req, res) => {
     return res.status(404).json({ error: 'Quote not found' });
   }
 
-  const { action, status, eta } = req.body || {};
+  const { action, status, eta, payment_received: paymentReceived } = req.body || {};
+
+  if (paymentReceived !== undefined) {
+    const updated = quoteManager.setPaymentReceived(quote.id, paymentReceived);
+    return res.json({ quote: updated });
+  }
 
   if (action) {
     if (action !== 'approve' && action !== 'reject') {

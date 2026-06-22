@@ -38,6 +38,12 @@ const EDITABLE_FIELDS = [
   'onboarding_checklist',
   'banking_details',
   'payment_link_url',
+  'google_calendar_enabled',
+  'google_client_id',
+  'google_client_secret',
+  'google_refresh_token',
+  'google_calendar_id',
+  'team_members',
 ];
 
 const REQUIRED_FIELDS = [
@@ -91,7 +97,35 @@ const DEFAULTS = {
   service_package: '',
   last_invoice_date: '',
   next_invoice_date: '',
+  google_calendar_enabled: false,
+  google_client_id: '',
+  google_client_secret: '',
+  google_refresh_token: '',
+  google_calendar_id: '',
+  team_members: [],
 };
+
+// Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
+// Banana, Tangerine, Peacock, Graphite, Blueberry, Basil, Tomato). Cycled
+// through as team members are added so each gets a distinct color without
+// the admin panel needing a color picker.
+const CALENDAR_COLOR_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'];
+
+/**
+ * Coerce arbitrary input into a clean team member list: an array of
+ * { name, color_id }, auto-assigning a colorId (cycling through
+ * CALENDAR_COLOR_IDS) to any entry missing one. Entries without a name are
+ * dropped.
+ */
+function sanitizeTeamMembers(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((entry, index) => ({
+      name: String((entry && entry.name) || '').trim(),
+      color_id: String((entry && entry.color_id) || '').trim() || CALENDAR_COLOR_IDS[index % CALENDAR_COLOR_IDS.length],
+    }))
+    .filter((entry) => entry.name);
+}
 
 // Fields a client can change themselves via PUT /client/settings. Notably
 // excludes phone_number_id, whatsapp_token, claude_api_key, quote_tier, etc.
@@ -262,6 +296,7 @@ function addClient(data) {
     quote_requests_enabled: Boolean(picked.quote_requests_enabled),
     quote_tier: Number(picked.quote_tier) === 2 ? 2 : 1,
     price_list: sanitizePriceList(picked.price_list),
+    team_members: sanitizeTeamMembers(picked.team_members),
     business_hours: { ...DEFAULT_BUSINESS_HOURS, ...(picked.business_hours || {}) },
     onboarding_checklist: { ...DEFAULT_ONBOARDING_CHECKLIST, ...(picked.onboarding_checklist || {}) },
     monthly_fee: Number(picked.monthly_fee ?? DEFAULTS.monthly_fee) || 0,
@@ -308,6 +343,9 @@ function updateClient(id, data) {
   if (picked.price_list !== undefined) {
     picked.price_list = sanitizePriceList(picked.price_list);
   }
+  if (picked.team_members !== undefined) {
+    picked.team_members = sanitizeTeamMembers(picked.team_members);
+  }
   if (picked.business_hours !== undefined) {
     picked.business_hours = {
       ...DEFAULT_BUSINESS_HOURS,
@@ -339,7 +377,7 @@ function updateClient(id, data) {
  * credentials and the portal password hash.
  */
 function sanitizeClientForPortal(client) {
-  const { whatsapp_token, claude_api_key, client_password, ...safe } = client;
+  const { whatsapp_token, claude_api_key, client_password, google_client_secret, google_refresh_token, ...safe } = client;
   return safe;
 }
 

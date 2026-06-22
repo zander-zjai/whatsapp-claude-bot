@@ -12,11 +12,9 @@ const { sendWhatsAppDocument } = require('./whatsapp');
  * fallback so there's always a concrete next step for the customer.
  */
 function buildQuoteCaption(client, quote) {
-  const parts = [`Here's your quote, valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')}.`];
+  const parts = [`Here's your quote! 🎉 It's valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA')}${quote.eta ? `, with an estimated completion time of ${quote.eta}` : ''}.`];
 
-  if (quote.eta) {
-    parts.push(`Estimated completion: ${quote.eta}.`);
-  }
+  parts.push(`If you have any questions or would like to make changes, just let us know — we're happy to help.`);
 
   if (client.payment_link_url) {
     parts.push(`To go ahead, pay here: ${client.payment_link_url}`);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -33,6 +33,7 @@ function tabForStatus(status) {
 }
 
 export default function ClientQuotes() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'open';
   const [quotes, setQuotes] = useState([]);
@@ -192,7 +193,11 @@ export default function ClientQuotes() {
                 </tr>
               )}
               {visibleQuotes.map((quote) => (
-                <tr key={quote.id} className="hover:bg-panel-2">
+                <tr
+                  key={quote.id}
+                  onClick={() => navigate(`/client/quotes/${quote.id}`)}
+                  className="cursor-pointer hover:bg-panel-2"
+                >
                   <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(quote.created_at)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.contact_number}</td>
@@ -213,7 +218,7 @@ export default function ClientQuotes() {
                       {quote.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-col gap-2" style={{ minWidth: 180 }}>
                       {quote.tier === 2 && quote.status === 'pending' && approvingId !== quote.id && (
                         <div className="flex gap-2">

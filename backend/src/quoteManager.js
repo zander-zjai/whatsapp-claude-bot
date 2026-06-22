@@ -47,6 +47,7 @@ function addQuote(entry) {
     id: crypto.randomUUID(),
     tier: 1,
     status: 'pending',
+    payment_received: false,
     created_at: new Date().toISOString(),
     ...entry,
   };
@@ -154,6 +155,7 @@ function addPdfQuote(entry) {
     valid_until: validUntil.toISOString(),
     expiry_reminder_sent: false,
     followup_sent: false,
+    payment_received: false,
     eta: null,
     ...entry,
   };
@@ -178,6 +180,16 @@ function setQuoteStatus(id, status) {
   const quote = getQuoteById(id);
   if (!quote) return undefined;
   quote.status = status;
+  quote.updated_at = new Date().toISOString();
+  persist();
+  return quote;
+}
+
+/** Set whether the customer's payment has been received (manual toggle, independent of won/lost). */
+function setPaymentReceived(id, value) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+  quote.payment_received = Boolean(value);
   quote.updated_at = new Date().toISOString();
   persist();
   return quote;
@@ -387,7 +399,7 @@ function buildQuoteInstructions(client) {
 You have access to this price list:
 ${priceListText}
 
-Once you have ALL FIVE details, match what the customer needs against the price list above and work out the quantity for each matching item (e.g. for a "per sqm" item, multiply the dimensions to get square metres; for a "per unit"/"each" item, use the quantity given). When you state the calculated price to the customer in this same reply, end with a soft close instead of a generic "is there anything else?" — give them a concrete next step, e.g. "This quote is valid for ${QUOTE_VALIDITY_DAYS} days — reply to confirm and we'll get you sorted with a deposit invoice." Adjust the wording naturally to fit the conversation, and reference these terms if it helps: ${client.quote_terms || DEFAULT_TERMS}. (Skip the soft close if nothing matched and no price was given — in that case just let them know the team will follow up.) Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
+Once you have ALL FIVE details, match what the customer needs against the price list above and work out the quantity for each matching item (e.g. for a "per sqm" item, multiply the dimensions to get square metres; for a "per unit"/"each" item, use the quantity given). When you state the calculated price to the customer in this same reply, make clear this is a rough estimate and not yet the final confirmed price — e.g. "Please note this is a rough estimate — our team will review and send you the final confirmed quote as soon as possible." Then end with a soft close instead of a generic "is there anything else?" — give them a concrete next step, e.g. "This quote is valid for ${QUOTE_VALIDITY_DAYS} days — reply to confirm and we'll get you sorted with a deposit invoice." Adjust the wording naturally to fit the conversation, and reference these terms if it helps: ${client.quote_terms || DEFAULT_TERMS}. (Skip the soft close if nothing matched and no price was given — in that case just let them know the team will follow up.) Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
 [[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
 
 If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
@@ -479,6 +491,7 @@ module.exports = {
   addPdfQuote,
   setQuoteStatus,
   setQuoteEta,
+  setPaymentReceived,
   getMostRecentPendingQuote,
   getQuotesNeedingExpiryReminder,
   markExpiryReminderSent,
