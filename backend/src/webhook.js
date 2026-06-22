@@ -241,12 +241,19 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
       text: trimmedCaption || "Here's an image — take a look and let me know what you think.",
       imageBase64: captured.base64,
       imageMimeType: captured.mime_type,
+      attachmentId: captured.id,
     });
     return;
   }
 
   if (trimmedCaption) {
-    await processMessage({ from, phoneNumberId, text: trimmedCaption, hasAttachment: true });
+    await processMessage({
+      from,
+      phoneNumberId,
+      text: trimmedCaption,
+      hasAttachment: true,
+      attachmentId: captured ? captured.id : null,
+    });
     return;
   }
 
@@ -259,6 +266,7 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
     bot_reply: NO_CAPTION_REPLY,
     response_time_ms: 0,
     status: sent ? 'success' : 'failed',
+    attachment_id: captured ? captured.id : null,
   });
 }
 
@@ -634,7 +642,15 @@ async function handleBookingAssignment(client, bookingId, teamMemberName) {
  *
  * Every processed message is recorded to logs.json for the admin panel.
  */
-async function processMessage({ from, phoneNumberId, text, hasAttachment = false, imageBase64 = null, imageMimeType = null }) {
+async function processMessage({
+  from,
+  phoneNumberId,
+  text,
+  hasAttachment = false,
+  imageBase64 = null,
+  imageMimeType = null,
+  attachmentId = null,
+}) {
   const client = clientManager.getClientByPhoneNumberId(phoneNumberId);
 
   if (!client) {
@@ -677,6 +693,7 @@ async function processMessage({ from, phoneNumberId, text, hasAttachment = false
       bot_reply: '(handover active - no reply sent)',
       response_time_ms: Date.now() - startedAt,
       status: 'handover',
+      attachment_id: attachmentId,
     });
     return;
   }
@@ -699,6 +716,7 @@ async function processMessage({ from, phoneNumberId, text, hasAttachment = false
       bot_reply: URGENT_REPLY,
       response_time_ms: Date.now() - startedAt,
       status: 'handover',
+      attachment_id: attachmentId,
     });
     return;
   }
@@ -720,6 +738,7 @@ async function processMessage({ from, phoneNumberId, text, hasAttachment = false
       bot_reply: reply,
       response_time_ms: Date.now() - startedAt,
       status: sent ? 'success' : 'failed',
+      attachment_id: attachmentId,
     });
     return;
   }
@@ -818,6 +837,7 @@ async function processMessage({ from, phoneNumberId, text, hasAttachment = false
     bot_reply: reply,
     response_time_ms: Date.now() - startedAt,
     status,
+    attachment_id: attachmentId,
   });
 }
 

@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { formatDateTime } from '../utils/format';
+import { getClientAttachmentBlob } from '../api/clientPortalEndpoints';
 
 // Bold + highlight Rand amounts (e.g. "R5,400.00") so prices jump out when
 // scanning a long quote conversation.
@@ -17,6 +19,43 @@ function highlightAmounts(text) {
   );
 }
 
+function AttachmentPreview({ attachmentId }) {
+  const [url, setUrl] = useState(null);
+  const [isImage, setIsImage] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let objectUrl;
+    getClientAttachmentBlob(attachmentId)
+      .then((blob) => {
+        setIsImage((blob.type || '').startsWith('image/'));
+        objectUrl = window.URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => setError(true));
+    return () => {
+      if (objectUrl) window.URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachmentId]);
+
+  if (error) return <p className="text-xs text-red-400">Failed to load attachment.</p>;
+  if (!url) return <div className="h-32 w-32 animate-pulse rounded-lg bg-panel-2" />;
+
+  if (isImage) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="block">
+        <img src={url} alt="Attachment" className="h-32 w-32 rounded-lg border border-line object-cover hover:opacity-80" />
+      </a>
+    );
+  }
+
+  return (
+    <a href={url} download className="text-xs text-primary underline">
+      Download attachment
+    </a>
+  );
+}
+
 export default function MessageBubble({ msg }) {
   const isFailed = msg.status === 'failed';
 
@@ -25,6 +64,11 @@ export default function MessageBubble({ msg }) {
       {msg.customer_message && (
         <div className="flex justify-start">
           <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-panel-2 px-4 py-2 text-sm text-cream">
+            {msg.attachment_id && (
+              <div className="mb-2">
+                <AttachmentPreview attachmentId={msg.attachment_id} />
+              </div>
+            )}
             <p className="whitespace-pre-wrap">{highlightAmounts(msg.customer_message)}</p>
             <p className="mt-1 text-[11px] text-grey">{formatDateTime(msg.timestamp)}</p>
           </div>
