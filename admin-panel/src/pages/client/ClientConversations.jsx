@@ -75,6 +75,7 @@ export default function ClientConversations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('priority') || 'all';
   const leadFilter = searchParams.get('lead');
+  const awaitingFilter = searchParams.get('awaiting') === 'human';
   const [conversations, setConversations] = useState([]);
   const [tab, setTab] = useState(PRIORITY_TABS.some((t) => t.key === initialTab) ? initialTab : 'all');
   const [loading, setLoading] = useState(true);
@@ -144,7 +145,8 @@ export default function ClientConversations() {
       if (tab === 'none') return !c.priority;
       return c.priority === tab;
     })
-    .filter((c) => !leadFilter || c.lead_temperature === leadFilter);
+    .filter((c) => !leadFilter || c.lead_temperature === leadFilter)
+    .filter((c) => !awaitingFilter || (c.awaiting_human && !c.handover_active));
   const counts = conversations.reduce((acc, c) => {
     const key = c.priority || 'none';
     acc[key] = (acc[key] || 0) + 1;
@@ -176,6 +178,23 @@ export default function ClientConversations() {
             onClick={() => {
               const next = new URLSearchParams(searchParams);
               next.delete('lead');
+              setSearchParams(next);
+            }}
+            className="font-medium underline underline-offset-2"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {awaitingFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+          Showing customers asking for you (a human) only.
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('awaiting');
               setSearchParams(next);
             }}
             className="font-medium underline underline-offset-2"

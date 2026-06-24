@@ -4,8 +4,9 @@ import ClientLayout from '../../components/ClientLayout';
 import StatsCard from '../../components/StatsCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
-import { getClientMe } from '../../api/clientPortalEndpoints';
+import { getClientMe, setClientConversationHandover } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
+import { whatsappDeepLink } from '../../utils/format';
 
 const SERVICE_INFO = {
   ai_receptionist: {
@@ -69,8 +70,10 @@ export default function ClientDashboard() {
   const [summary, setSummary] = useState(null);
   const [pendingQuotes, setPendingQuotes] = useState([]);
   const [hotLeads, setHotLeads] = useState([]);
+  const [awaitingHuman, setAwaitingHuman] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [takingOverNumber, setTakingOverNumber] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +88,7 @@ export default function ClientDashboard() {
         setSummary(data.summary);
         setPendingQuotes(data.pending_quotes || []);
         setHotLeads(data.hot_leads || []);
+        setAwaitingHuman(data.awaiting_human || []);
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err, 'Failed to load dashboard'));
       } finally {
@@ -97,6 +101,21 @@ export default function ClientDashboard() {
       cancelled = true;
     };
   }, []);
+
+  async function handleTakeOver(customerNumber) {
+    setTakingOverNumber(customerNumber);
+    try {
+      await setClientConversationHandover(customerNumber, true);
+      setAwaitingHuman((prev) => prev.filter((c) => c.customer_number !== customerNumber));
+      const link = whatsappDeepLink(customerNumber);
+      if (link) window.open(link, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      // Best-effort from the dashboard -- the Conversations page has the full
+      // error handling if this fails for some reason.
+    } finally {
+      setTakingOverNumber(null);
+    }
+  }
 
   return (
     <ClientLayout title="Dashboard">
@@ -132,6 +151,13 @@ export default function ClientDashboard() {
               icon="🔥"
             />
             <LinkedStatsCard
+              to="/client/conversations?awaiting=human"
+              label="Needs You"
+              value={summary.awaiting_human}
+              status={summary.awaiting_human > 0 ? 'offline' : undefined}
+              icon="🙋"
+            />
+            <LinkedStatsCard
               to="/client/quotes?tab=won"
               label="Won This Month"
               value={summary.won_quotes_this_month}
@@ -139,6 +165,43 @@ export default function ClientDashboard() {
             />
             <LinkedStatsCard to="/client/calls" label="Calls Today" value={summary.calls_today} icon="📞" />
           </div>
+
+          {awaitingHuman.length > 0 && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide">
+                  🙋 Customers Asking For You ({awaitingHuman.length})
+                </h3>
+                <Link to="/client/conversations?awaiting=human" className="text-xs font-medium text-red-400 hover:underline">
+                  View all →
+                </Link>
+              </div>
+              <ul className="space-y-2">
+                {awaitingHuman.map((c) => (
+                  <li
+                    key={c.customer_number}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm"
+                  >
+                    <Link
+                      to={`/client/conversations/${encodeURIComponent(c.customer_number)}`}
+                      className="min-w-0 flex-1 hover:underline"
+                    >
+                      <p className="text-cream">{c.customer_name || c.customer_number}</p>
+                      <p className="truncate text-xs text-cream-dim">{c.last_message_preview}</p>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleTakeOver(c.customer_number)}
+                      disabled={takingOverNumber === c.customer_number}
+                      className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-60"
+                    >
+                      Take Over
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">

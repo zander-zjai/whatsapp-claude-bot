@@ -67,6 +67,7 @@ router.get('/me', async (req, res) => {
 
   const pendingQuotes = quotes.filter((q) => q.status === 'pending');
   const hotConversations = conversations.filter((c) => c.lead_temperature === 'hot');
+  const awaitingHumanConversations = conversations.filter((c) => c.awaiting_human && !c.handover_active);
   const wonQuotesThisMonth = quotes.filter((q) => q.status === 'won' && isThisMonth(q.updated_at));
 
   let callsToday = 0;
@@ -98,6 +99,7 @@ router.get('/me', async (req, res) => {
       active_conversations: conversations.length,
       pending_quotes: pendingQuotes.length,
       hot_leads: hotConversations.length,
+      awaiting_human: awaitingHumanConversations.length,
       won_quotes_this_month: wonQuotesThisMonth.length,
       calls_today: callsToday,
     },
@@ -113,6 +115,11 @@ router.get('/me', async (req, res) => {
       customer_name: c.customer_name,
       last_message_preview: c.last_message_preview,
       lead_reason: c.lead_reason,
+    })),
+    awaiting_human: awaitingHumanConversations.slice(0, 5).map((c) => ({
+      customer_number: c.customer_number,
+      customer_name: c.customer_name,
+      last_message_preview: c.last_message_preview,
     })),
   });
 });
