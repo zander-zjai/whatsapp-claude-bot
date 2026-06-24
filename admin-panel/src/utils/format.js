@@ -25,3 +25,11 @@ export function formatDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString();
 }
+
+/** Build a wa.me deep link that opens a chat with this number on the owner's own WhatsApp. */
+export function whatsappDeepLink(number) {
+  if (!number) return null;
+  const digitsOnly = String(number).replace(/[^\d]/g, '');
+  if (!digitsOnly) return null;
+  return `https://wa.me/${digitsOnly}`;
+}

@@ -9,7 +9,7 @@ import {
   setClientConversationPriority,
 } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
-import { maskPhoneNumber, truncate, formatDateTime } from '../../utils/format';
+import { maskPhoneNumber, truncate, formatDateTime, whatsappDeepLink } from '../../utils/format';
 
 function conversationStatus(conv) {
   if (conv.handover_active) return 'handover';
@@ -100,13 +100,20 @@ export default function ClientConversations() {
   }, []);
 
   async function handleToggleHandover(conv) {
+    const takingOver = !conv.handover_active;
     setActionError('');
     setPendingNumber(conv.customer_number);
     try {
-      const updated = await setClientConversationHandover(conv.customer_number, !conv.handover_active);
+      const updated = await setClientConversationHandover(conv.customer_number, takingOver);
       setConversations((prev) =>
         prev.map((c) => (c.customer_number === conv.customer_number ? updated : c))
       );
+      // Taking over: open a WhatsApp chat with this customer on the owner's
+      // own number, so they don't have to go find the number themselves.
+      if (takingOver) {
+        const link = whatsappDeepLink(updated.customer_number);
+        if (link) window.open(link, '_blank', 'noopener,noreferrer');
+      }
     } catch (err) {
       setActionError(getErrorMessage(err, 'Failed to update handover status'));
     } finally {
