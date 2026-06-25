@@ -31,6 +31,15 @@ function LeadBadge({ tag, reason }) {
   );
 }
 
+function CallbackBadge({ requested }) {
+  if (!requested) return null;
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+      📞 Callback Needed
+    </span>
+  );
+}
+
 function EndedBadge({ reason }) {
   const lower = (reason || '').toLowerCase();
   const isCustomer = lower.includes('customer');
@@ -92,6 +101,7 @@ export default function ClientCallLogs() {
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Caller</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Ended</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Lead</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Action</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Summary</th>
               </tr>
             </thead>
@@ -105,12 +115,17 @@ export default function ClientCallLogs() {
                   <td className="px-4 py-3 text-cream-dim whitespace-nowrap">
                     {formatDateTime(call.timestamp)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-cream">{call.caller || 'Unknown'}</td>
+                  <td className="px-4 py-3 font-medium text-cream">
+                    {call.caller_name || call.caller || 'Unknown'}
+                  </td>
                   <td className="px-4 py-3">
                     <EndedBadge reason={call.ended_reason} />
                   </td>
                   <td className="px-4 py-3">
                     <LeadBadge tag={call.lead_tag} reason={call.lead_reason} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <CallbackBadge requested={call.callback_requested} />
                   </td>
                   <td className="px-4 py-3 text-cream-dim">
                     {expanded === call.id ? (
