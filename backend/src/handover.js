@@ -16,10 +16,20 @@ function isUrgentMessage(text) {
   return URGENT_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
-/** True if an incoming message's sender is this client's configured owner. */
+/** owner_phone may hold a single number or a comma-separated list (e.g. owner
+ *  + receptionist + designer), all of whom can issue #takeover/#release/etc. */
+function getOwnerNumbers(client) {
+  if (!client || !client.owner_phone) return [];
+  return String(client.owner_phone)
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
+/** True if an incoming message's sender is one of this client's configured owner numbers. */
 function isFromOwner(client, from) {
-  if (!client || !client.owner_phone) return false;
-  return normalizeNumber(from) === normalizeNumber(client.owner_phone);
+  const normalizedFrom = normalizeNumber(from);
+  return getOwnerNumbers(client).some((n) => normalizeNumber(n) === normalizedFrom);
 }
 
 // "#takeover", "#release", optionally followed by a customer number, e.g.
@@ -52,4 +62,4 @@ function parseOwnerCommand(text) {
   return { command: match[1].toLowerCase(), number: match[2] || null };
 }
 
-module.exports = { isUrgentMessage, isFromOwner, parseOwnerCommand, URGENT_KEYWORDS };
+module.exports = { isUrgentMessage, isFromOwner, parseOwnerCommand, getOwnerNumbers, URGENT_KEYWORDS };

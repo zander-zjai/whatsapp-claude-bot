@@ -276,13 +276,13 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
  * notification can never break the customer-facing reply.
  */
 async function notifyOwner(client, text, { email = false, emailSubject } = {}) {
-  if (client.owner_phone) {
+  for (const ownerNumber of handover.getOwnerNumbers(client)) {
     try {
-      await sendWhatsAppMessage(client, normalizeNumber(client.owner_phone), text);
+      await sendWhatsAppMessage(client, normalizeNumber(ownerNumber), text);
     } catch (err) {
       const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-      logError(`[${client.name}] Failed to notify owner:`, detail);
-      errorLogger.logErrorToFile(`[${client.name}] Failed to notify owner: ${detail}`, err);
+      logError(`[${client.name}] Failed to notify owner (${maskPhone(ownerNumber)}):`, detail);
+      errorLogger.logErrorToFile(`[${client.name}] Failed to notify owner (${maskPhone(ownerNumber)}): ${detail}`, err);
     }
   }
 

@@ -327,19 +327,20 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-cream">Owner & Handover</h2>
         <div>
-          <label className={labelClass}>Owner WhatsApp Number</label>
+          <label className={labelClass}>Owner / Staff WhatsApp Number(s)</label>
           <input
-            type="tel"
+            type="text"
             name="owner_phone"
             value={values.owner_phone}
             onChange={handleChange}
-            placeholder="+27821234567"
+            placeholder="+27821234567, +27821234568"
             className={inputClass}
           />
           <p className="mt-1 text-xs text-cream-dim">
-            From this number, send <code>#takeover</code> to silence Zara for a conversation and{' '}
-            <code>#release</code> to hand it back. Zara also notifies this number when a customer
-            asks for a human or after-hours urgent help.
+            One number, or a comma-separated list (e.g. owner + receptionist + designer). Any of
+            these numbers can send <code>#takeover</code> to silence Zara for a conversation and{' '}
+            <code>#release</code> to hand it back. Zara notifies all of them when a customer asks
+            for a human or after-hours urgent help.
           </p>
         </div>
       </section>
