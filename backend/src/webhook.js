@@ -98,6 +98,11 @@ function parseIncomingMessage(body) {
     const phoneNumberId = value.metadata && value.metadata.phone_number_id;
     const from = message.from; // customer's WhatsApp number
 
+    // TEMP DIAGNOSTIC (remove once the phone_number_id routing issue is
+    // resolved): log the full metadata block so we can see display_phone_number
+    // alongside phone_number_id when Meta's webhook reports an unexpected ID.
+    log(`[diagnostic] webhook metadata: ${JSON.stringify(value.metadata)}`);
+
     // Images/documents (e.g. design files) are captured as attachments
     // rather than passed to Claude — see processMessage's media branch.
     if (message.type === 'image' || message.type === 'document') {
