@@ -12,6 +12,7 @@ let polling = false;
 /** Process all unread mail for one client: generate + send a Claude reply, then mark read. */
 async function processClient(client) {
   const unread = await gmailClient.listUnreadForClient(client);
+  log(`[${client.name}] Email poll: ${unread.length} unread message(s) for ${client.email_address}`);
   if (unread.length === 0) return 0;
 
   let handled = 0;
@@ -36,6 +37,7 @@ async function processClient(client) {
 
       await gmailClient.markAsRead(client, id);
       handled += 1;
+      log(`[${client.name}] Replied to email from ${message.fromAddress} (subject: "${message.subject}")`);
     } catch (err) {
       logError(`[${client.name}] Failed to process email ${id}:`, err.message);
     }
