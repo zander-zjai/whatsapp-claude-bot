@@ -2,6 +2,7 @@
 
 const { getAnthropicClient, resolveApiKey, MODEL } = require('./claude');
 const usageManager = require('./usageManager');
+const quoteManager = require('./quoteManager');
 
 const MAX_TOKENS = 1024;
 
@@ -19,7 +20,9 @@ function buildEmailSystemPrompt(client) {
     `You are replying to a customer email on behalf of ${client.name}. Write a complete, professional email reply: no chat-style abbreviations, a clear greeting using the sender's name if known, and a sign-off. Keep it concise — a few short paragraphs at most. Do not include a subject line in your reply; just write the email body.`,
   ];
 
-  if (Array.isArray(client.price_list) && client.price_list.length > 0) {
+  if (client.quote_requests_enabled) {
+    parts.push(quoteManager.buildQuoteInstructions(client));
+  } else if (Array.isArray(client.price_list) && client.price_list.length > 0) {
     const priceListText = client.price_list
       .map((p) => `- ${p.item} (${p.unit}): R${Number(p.price).toFixed(2)}`)
       .join('\n');

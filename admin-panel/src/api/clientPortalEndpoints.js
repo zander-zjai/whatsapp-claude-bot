@@ -55,6 +55,10 @@ export const updateClientPriceList = (priceList) =>
 export const getClientCallLogs = () =>
   clientPortalApi.get('/client/calls').then((r) => r.data.calls || []);
 
+// --- Email Receptionist ---
+export const getClientEmails = () =>
+  clientPortalApi.get('/client/emails').then((r) => r.data.emails || []);
+
 // --- Settings ---
 export const getClientSettings = () =>
   clientPortalApi.get('/client/settings').then((r) => r.data.settings);

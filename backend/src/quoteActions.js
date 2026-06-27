@@ -4,6 +4,7 @@ const { logError } = require('./logger');
 const errorLogger = require('./errorLogger');
 const quoteManager = require('./quoteManager');
 const { sendWhatsAppDocument } = require('./whatsapp');
+const gmailClient = require('./gmailClient');
 
 /**
  * Build the customer-facing caption that goes out with the PDF: validity,
@@ -25,12 +26,26 @@ function buildQuoteCaption(client, quote) {
   return parts.join(' ');
 }
 
-/** Send a generated PDF quote to the customer. Returns true on success. */
+/**
+ * Send a generated PDF quote to the customer, via whichever channel the
+ * request came in on. `quote.customer_number` holds a phone number for
+ * WhatsApp-sourced quotes, or an email address for email-sourced ones.
+ * Returns true on success.
+ */
 async function sendQuotePdf(client, quote, pdfBuffer) {
+  const filename = `Quote-${quote.id.slice(0, 8)}.pdf`;
+  const caption = buildQuoteCaption(client, quote);
   try {
-    const filename = `Quote-${quote.id.slice(0, 8)}.pdf`;
-    const caption = buildQuoteCaption(client, quote);
-    await sendWhatsAppDocument(client, quote.customer_number, pdfBuffer, filename, caption);
+    if (quote.channel === 'email') {
+      await gmailClient.sendReply(client, {
+        to: quote.customer_number,
+        subject: `Your quote from ${client.name}`,
+        bodyText: caption,
+        attachment: { buffer: pdfBuffer, filename, mimeType: 'application/pdf' },
+      });
+    } else {
+      await sendWhatsAppDocument(client, quote.customer_number, pdfBuffer, filename, caption);
+    }
     return true;
   } catch (err) {
     const detail = err.response ? JSON.stringify(err.response.data) : err.message;

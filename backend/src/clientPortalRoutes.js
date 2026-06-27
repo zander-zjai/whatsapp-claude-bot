@@ -8,6 +8,7 @@ const clientManager = require('./clientManager');
 const clientAuth = require('./clientAuth');
 const conversationManager = require('./conversationManager');
 const logsManager = require('./logsManager');
+const emailLogsManager = require('./emailLogsManager');
 const quoteManager = require('./quoteManager');
 const quoteActions = require('./quoteActions');
 const mediaManager = require('./mediaManager');
@@ -71,6 +72,8 @@ router.get('/me', async (req, res) => {
   const wonQuotesThisMonth = quotes.filter((q) => q.status === 'won' && isThisMonth(q.updated_at));
 
   let callsToday = 0;
+  let recentCalls = [];
+  let missedCallsCount = 0;
   const jarvisUrl = process.env.JARVIS_URL;
   const callsApiKey = process.env.CALLS_API_KEY;
   if (jarvisUrl && callsApiKey) {
@@ -83,6 +86,18 @@ router.get('/me', async (req, res) => {
         const calls = data.calls || [];
         const todayStr = now.toISOString().slice(0, 10);
         callsToday = calls.filter((c) => (c.timestamp || '').slice(0, 10) === todayStr).length;
+        missedCallsCount = calls.filter((c) => (c.ended_reason || '').toLowerCase().includes('customer')).length;
+        recentCalls = calls
+          .slice()
+          .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+          .slice(0, 5)
+          .map((c) => ({
+            caller_name: c.caller_name,
+            caller: c.caller,
+            summary: c.summary,
+            callback_requested: c.callback_requested,
+            timestamp: c.timestamp,
+          }));
       }
     } catch (err) {
       // Calls dashboard stat is best-effort -- JARVIS being unreachable
@@ -102,13 +117,17 @@ router.get('/me', async (req, res) => {
       awaiting_human: awaitingHumanConversations.length,
       won_quotes_this_month: wonQuotesThisMonth.length,
       calls_today: callsToday,
+      missed_calls_total: missedCallsCount,
+      emails_today: emailLogsManager.getTodayCountForClient(client.id),
     },
+    recent_calls: recentCalls,
     pending_quotes: pendingQuotes.slice(0, 5).map((q) => ({
       id: q.id,
       name: q.name,
       item_description: q.item_description,
       total: q.total,
       tier: q.tier,
+      channel: q.channel || 'whatsapp',
     })),
     hot_leads: hotConversations.slice(0, 5).map((c) => ({
       customer_number: c.customer_number,
@@ -120,6 +139,23 @@ router.get('/me', async (req, res) => {
       customer_number: c.customer_number,
       customer_name: c.customer_name,
       last_message_preview: c.last_message_preview,
+    })),
+    recent_conversations: conversations
+      .slice()
+      .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
+      .slice(0, 5)
+      .map((c) => ({
+        customer_number: c.customer_number,
+        customer_name: c.customer_name,
+        last_message_preview: c.last_message_preview,
+        last_message_at: c.last_message_at,
+      })),
+    recent_emails: emailLogsManager.getLogsForClient(client.id, { limit: 5 }).map((l) => ({
+      id: l.id,
+      from_address: l.from_address,
+      from_name: l.from_name,
+      subject: l.subject,
+      timestamp: l.timestamp,
     })),
   });
 });
@@ -333,6 +369,15 @@ router.get('/quotes/:id/pdf', (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="quote-${quote.id.slice(0, 8)}.pdf"`);
   fs.createReadStream(pdfPath).pipe(res);
+});
+
+// ------------------------------------------------------------------
+// Email Receptionist thread
+// ------------------------------------------------------------------
+
+/** GET /client/emails — recent email exchanges for this client. */
+router.get('/emails', (req, res) => {
+  res.json({ emails: emailLogsManager.getLogsForClient(req.clientId, { limit: 100 }) });
 });
 
 // ------------------------------------------------------------------

@@ -65,12 +65,39 @@ function LinkedStatsCard({ to, ...props }) {
   );
 }
 
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function ChannelSection({ icon, title, viewAllTo, children }) {
+  return (
+    <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-cream-dim uppercase tracking-wide">
+          <span>{icon}</span>
+          {title}
+        </h3>
+        {viewAllTo && (
+          <Link to={viewAllTo} className="text-xs font-medium text-primary hover:underline">
+            View all →
+          </Link>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function ClientDashboard() {
   const [client, setClient] = useState(null);
   const [summary, setSummary] = useState(null);
   const [pendingQuotes, setPendingQuotes] = useState([]);
   const [hotLeads, setHotLeads] = useState([]);
   const [awaitingHuman, setAwaitingHuman] = useState([]);
+  const [recentConversations, setRecentConversations] = useState([]);
+  const [recentEmails, setRecentEmails] = useState([]);
+  const [recentCalls, setRecentCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [takingOverNumber, setTakingOverNumber] = useState(null);
@@ -89,6 +116,9 @@ export default function ClientDashboard() {
         setPendingQuotes(data.pending_quotes || []);
         setHotLeads(data.hot_leads || []);
         setAwaitingHuman(data.awaiting_human || []);
+        setRecentConversations(data.recent_conversations || []);
+        setRecentEmails(data.recent_emails || []);
+        setRecentCalls(data.recent_calls || []);
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err, 'Failed to load dashboard'));
       } finally {
@@ -203,6 +233,70 @@ export default function ClientDashboard() {
             </div>
           )}
 
+          <div>
+            <h3 className="mb-3 text-sm font-semibold text-cream uppercase tracking-wide">By Channel</h3>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <ChannelSection icon="💬" title="WhatsApp" viewAllTo="/client/conversations">
+                {recentConversations.length === 0 ? (
+                  <p className="text-sm text-cream-dim">No conversations yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentConversations.map((c) => (
+                      <li key={c.customer_number}>
+                        <Link
+                          to={`/client/conversations/${encodeURIComponent(c.customer_number)}`}
+                          className="block rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm hover:border-primary"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-cream">{c.customer_name || c.customer_number}</p>
+                            <p className="text-xs text-cream-dim">{formatDateTime(c.last_message_at)}</p>
+                          </div>
+                          <p className="truncate text-xs text-cream-dim">{c.last_message_preview}</p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ChannelSection>
+
+              <ChannelSection icon="📧" title="Email" viewAllTo="/client/emails">
+                {recentEmails.length === 0 ? (
+                  <p className="text-sm text-cream-dim">No emails yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentEmails.map((e) => (
+                      <li key={e.id} className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="text-cream">{e.from_name || e.from_address}</p>
+                          <p className="text-xs text-cream-dim">{formatDateTime(e.timestamp)}</p>
+                        </div>
+                        <p className="truncate text-xs text-cream-dim">{e.subject || '(no subject)'}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ChannelSection>
+
+              <ChannelSection icon="📞" title="Missed Calls" viewAllTo="/client/calls">
+                {recentCalls.length === 0 ? (
+                  <p className="text-sm text-cream-dim">No calls yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentCalls.map((c, i) => (
+                      <li key={i} className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="text-cream">{c.caller_name || c.caller || 'Unknown'}</p>
+                          <p className="text-xs text-cream-dim">{formatDateTime(c.timestamp)}</p>
+                        </div>
+                        <p className="truncate text-xs text-cream-dim">{c.summary}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ChannelSection>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
@@ -222,7 +316,7 @@ export default function ClientDashboard() {
                         className="flex items-center justify-between rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm hover:border-primary"
                       >
                         <span className="text-cream">
-                          {q.name} — {q.item_description}
+                          {q.channel === 'email' ? '📧' : '📱'} {q.name} — {q.item_description}
                         </span>
                         <span className="text-cream-dim">{q.tier === 2 ? `R${Number(q.total || 0).toFixed(2)}` : '—'}</span>
                       </Link>

@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const { google } = require('googleapis');
 const settingsManager = require('./settingsManager');
 
@@ -129,23 +130,55 @@ async function getMessage(client, messageId) {
   };
 }
 
-function buildRawEmail({ from, to, subject, bodyText, inReplyTo, references }) {
+function buildRawEmail({ from, to, subject, bodyText, inReplyTo, references, attachment }) {
+  if (!attachment) {
+    const lines = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+    ];
+    if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
+    if (references) lines.push(`References: ${references}`);
+    lines.push('', bodyText);
+
+    const raw = lines.join('\r\n');
+    return Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // Multipart/mixed: text body + one binary attachment (e.g. a quote PDF).
+  const boundary = `zjai_${crypto.randomBytes(8).toString('hex')}`;
   const lines = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${subject}`,
-    'Content-Type: text/plain; charset="UTF-8"',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
   ];
   if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
   if (references) lines.push(`References: ${references}`);
-  lines.push('', bodyText);
+  lines.push(
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    bodyText,
+    '',
+    `--${boundary}`,
+    `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+    'Content-Transfer-Encoding: base64',
+    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    '',
+    attachment.buffer.toString('base64'),
+    '',
+    `--${boundary}--`
+  );
 
   const raw = lines.join('\r\n');
   return Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** Send a reply in the same thread, From the client's monitored alias address. */
-async function sendReply(client, { threadId, to, subject, bodyText, inReplyTo, references }) {
+/** Send a reply, From the client's monitored alias address. `threadId` keeps it in an existing thread; omit it to start a new one. An optional `attachment` ({ buffer, filename, mimeType }) sends a multipart email instead of plain text. */
+async function sendReply(client, { threadId, to, subject, bodyText, inReplyTo, references, attachment }) {
   const gmail = gmailClientFor(client);
   const raw = buildRawEmail({
     from: client.email_address,
@@ -154,11 +187,12 @@ async function sendReply(client, { threadId, to, subject, bodyText, inReplyTo, r
     bodyText,
     inReplyTo,
     references,
+    attachment,
   });
 
   await gmail.users.messages.send({
     userId: 'me',
-    requestBody: { raw, threadId },
+    requestBody: threadId ? { raw, threadId } : { raw },
   });
 }
 

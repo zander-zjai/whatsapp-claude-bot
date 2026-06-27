@@ -6,6 +6,7 @@ const BASE_NAV_ITEMS = [
   { to: '/client/calls', label: 'Call Logs', icon: '📞' },
   { to: '/client/leads', label: 'Leads', icon: '🙋' },
   { to: '/client/conversations', label: 'Conversations', icon: '💬' },
+  { to: '/client/emails', label: 'Emails', icon: '📧' },
   { to: '/client/quotes', label: 'Quote Requests', icon: '📋' },
 ];
 

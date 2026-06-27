@@ -172,6 +172,7 @@ export default function ClientQuotes() {
             <thead className="bg-panel-2">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Channel</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Contact</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Item</th>
@@ -187,7 +188,7 @@ export default function ClientQuotes() {
             <tbody className="divide-y divide-line">
               {visibleQuotes.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center text-cream-dim">
+                  <td colSpan={12} className="px-4 py-10 text-center text-cream-dim">
                     No {tab} quote requests.
                   </td>
                 </tr>
@@ -199,6 +200,9 @@ export default function ClientQuotes() {
                   className="cursor-pointer hover:bg-panel-2"
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(quote.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim" title={quote.channel === 'email' ? 'Email' : 'WhatsApp'}>
+                    {quote.channel === 'email' ? '📧' : '📱'}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.contact_number}</td>
                   <td className="px-4 py-3 text-cream">{quote.item_description}</td>

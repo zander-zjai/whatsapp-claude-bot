@@ -26,6 +26,7 @@ const quoteReminders = require('./src/quoteReminders');
 const bookingsManager = require('./src/bookingsManager');
 const mediaManager = require('./src/mediaManager');
 const usageManager = require('./src/usageManager');
+const emailLogsManager = require('./src/emailLogsManager');
 const emailPoller = require('./src/emailPoller');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
@@ -52,6 +53,7 @@ quoteManager.load();
 bookingsManager.load();
 mediaManager.load();
 usageManager.load();
+emailLogsManager.load();
 emailPoller.startEmailPolling();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
