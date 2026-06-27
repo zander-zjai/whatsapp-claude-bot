@@ -5,7 +5,7 @@ import ClientForm from '../components/ClientForm';
 import UsageSection from '../components/UsageSection';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
-import { getClient, updateClient } from '../api/endpoints';
+import { getClient, updateClient, getGmailAuthUrl } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 
 const CHECKLIST_ITEMS = [
@@ -58,6 +58,56 @@ function SetupChecklist({ client, onChange }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+function EmailReceptionistSection({ client }) {
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState('');
+  const connected = Boolean(client.gmail_refresh_token);
+
+  const params = new URLSearchParams(window.location.search);
+  const gmailStatus = params.get('gmail');
+
+  async function handleConnect() {
+    setError('');
+    setConnecting(true);
+    try {
+      const url = await getGmailAuthUrl(client.id);
+      window.location.href = url;
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to start Gmail connection'));
+      setConnecting(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+      <h2 className="mb-2 text-base font-semibold text-cream">Email Receptionist — Gmail Connection</h2>
+      {gmailStatus === 'connected' && (
+        <p className="mb-3 text-sm text-green-400">Gmail connected successfully.</p>
+      )}
+      {gmailStatus === 'error' && (
+        <p className="mb-3 text-sm text-red-400">Gmail connection failed — try again.</p>
+      )}
+      <ErrorMessage message={error} />
+      <p className="mb-3 text-sm text-cream-dim">
+        {connected
+          ? `Connected — replies are sent from ${client.email_address || 'the configured address'}.`
+          : 'Not connected yet. Set the monitored email address below and save, then connect Gmail.'}
+      </p>
+      <button
+        type="button"
+        onClick={handleConnect}
+        disabled={connecting || !client.email_address}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink hover:bg-primary-50 disabled:opacity-50"
+      >
+        {connecting ? 'Redirecting…' : connected ? 'Reconnect Gmail' : 'Connect Gmail'}
+      </button>
+      {!client.email_address && (
+        <p className="mt-2 text-xs text-cream-dim">Save an email address below first.</p>
+      )}
     </section>
   );
 }
@@ -119,6 +169,7 @@ export default function EditClient() {
             }
           />
           <UsageSection clientId={client.id} />
+          <EmailReceptionistSection client={client} />
           <ClientForm
             initialValues={client}
             onSubmit={handleSubmit}

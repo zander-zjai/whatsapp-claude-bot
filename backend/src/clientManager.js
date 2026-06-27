@@ -45,6 +45,9 @@ const EDITABLE_FIELDS = [
   'google_calendar_id',
   'team_members',
   'monthly_interaction_cap',
+  'email_receptionist_enabled',
+  'email_address',
+  'gmail_refresh_token',
 ];
 
 const REQUIRED_FIELDS = [
@@ -105,6 +108,9 @@ const DEFAULTS = {
   google_calendar_id: '',
   team_members: [],
   monthly_interaction_cap: 750,
+  email_receptionist_enabled: false,
+  email_address: '',
+  gmail_refresh_token: '',
 };
 
 // Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
@@ -391,6 +397,7 @@ function sanitizeClientForPortal(client) {
     client_password,
     google_client_secret,
     google_refresh_token,
+    gmail_refresh_token,
     monthly_interaction_cap,
     ...safe
   } = client;

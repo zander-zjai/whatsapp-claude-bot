@@ -14,6 +14,8 @@ const clientAuth = require('./clientAuth');
 const conversationManager = require('./conversationManager');
 const quoteManager = require('./quoteManager');
 const usageManager = require('./usageManager');
+const gmailClient = require('./gmailClient');
+const emailPoller = require('./emailPoller');
 
 const router = express.Router();
 
@@ -45,6 +47,38 @@ router.post('/login', loginLimiter, (req, res) => {
   const token = auth.issueToken(username);
   log(`Admin login: ${username}`);
   return res.json({ token });
+});
+
+// ------------------------------------------------------------------
+// GET /admin/oauth/gmail/callback (public — hit directly by Google's
+// redirect, which carries no Authorization header. The `state` param
+// (set when the auth URL was generated) carries which client this
+// grant belongs to.)
+// ------------------------------------------------------------------
+router.get('/oauth/gmail/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  const portalUrl = settingsManager.getSettings().client_portal_url;
+
+  if (error) {
+    return res.redirect(`${portalUrl}/clients/edit/${state}?gmail=error`);
+  }
+
+  const client = clientManager.getClientById(state);
+  if (!client) {
+    return res.status(404).send('Unknown client for this OAuth state.');
+  }
+
+  try {
+    const { refreshToken, emailAddress } = await gmailClient.exchangeCodeForTokens(code);
+    clientManager.updateClient(client.id, {
+      gmail_refresh_token: refreshToken,
+      email_address: client.email_address || emailAddress,
+    });
+    return res.redirect(`${portalUrl}/clients/edit/${client.id}?gmail=connected`);
+  } catch (err) {
+    logError(`Gmail OAuth callback failed for ${client.name}:`, err.message);
+    return res.redirect(`${portalUrl}/clients/edit/${client.id}?gmail=error`);
+  }
 });
 
 // Everything below this line requires a valid JWT.
@@ -202,6 +236,35 @@ router.get('/clients/:id/usage', (req, res) => {
 /** GET /admin/usage/summary — total estimated Anthropic spend this month across every client. */
 router.get('/usage/summary', (req, res) => {
   res.json({ summary: usageManager.getMonthlySummary() });
+});
+
+// ------------------------------------------------------------------
+// Email Receptionist (Gmail OAuth + manual poll trigger)
+// ------------------------------------------------------------------
+
+/** POST /admin/clients/:id/gmail-auth-url — returns the Google consent URL to open for this client. */
+router.post('/clients/:id/gmail-auth-url', (req, res) => {
+  const client = clientManager.getClientById(req.params.id);
+  if (!client) {
+    return res.status(404).json({ error: 'Client not found' });
+  }
+  try {
+    const url = gmailClient.buildAuthUrl(client.id);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /admin/email/poll-now — manually trigger one poll cycle across every email-enabled client (also used by /handle-email below). */
+router.post('/email/poll-now', async (req, res) => {
+  try {
+    const results = await emailPoller.pollAllClients();
+    res.json({ results });
+  } catch (err) {
+    logError('Manual email poll failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ------------------------------------------------------------------

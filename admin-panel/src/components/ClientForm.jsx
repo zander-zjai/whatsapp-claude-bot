@@ -40,6 +40,8 @@ export const DEFAULT_CLIENT_VALUES = {
   service_package: '',
   last_invoice_date: '',
   next_invoice_date: '',
+  email_receptionist_enabled: false,
+  email_address: '',
 };
 
 const inputClass =
@@ -585,6 +587,42 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                 </div>
               </>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* Email Receptionist */}
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Email Receptionist</h2>
+        <label className="flex items-center gap-3">
+          <button
+            type="button"
+            className="switch"
+            data-on={values.email_receptionist_enabled}
+            onClick={() => set('email_receptionist_enabled', !values.email_receptionist_enabled)}
+          >
+            <span />
+          </button>
+          <span className="text-sm text-cream-dim">
+            Auto-replies to incoming emails using Claude, the same system prompt and price list
+            as above.
+          </span>
+        </label>
+
+        {values.email_receptionist_enabled && (
+          <div className="mt-4">
+            <label className={labelClass}>Monitored Email Address</label>
+            <input
+              type="email"
+              value={values.email_address}
+              onChange={(e) => set('email_address', e.target.value)}
+              placeholder="support@clientbusiness.com"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-cream-dim">
+              Save this first, then use the "Connect Gmail" button above to authorize access
+              (one-time Google consent).
+            </p>
           </div>
         )}
       </section>

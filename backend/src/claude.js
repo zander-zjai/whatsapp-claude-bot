@@ -151,4 +151,4 @@ async function getClaudeReply(client, history, options = {}) {
   return text;
 }
 
-module.exports = { getClaudeReply, MODEL };
+module.exports = { getClaudeReply, getAnthropicClient, resolveApiKey, MODEL };

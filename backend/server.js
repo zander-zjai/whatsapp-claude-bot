@@ -26,6 +26,7 @@ const quoteReminders = require('./src/quoteReminders');
 const bookingsManager = require('./src/bookingsManager');
 const mediaManager = require('./src/mediaManager');
 const usageManager = require('./src/usageManager');
+const emailPoller = require('./src/emailPoller');
 const { verifyWebhook, verifyMetaSignature, handleWebhook } = require('./src/webhook');
 const adminRoutes = require('./src/adminRoutes');
 const clientPortalRoutes = require('./src/clientPortalRoutes');
@@ -51,6 +52,7 @@ quoteManager.load();
 bookingsManager.load();
 mediaManager.load();
 usageManager.load();
+emailPoller.startEmailPolling();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
 errorLogger.cleanupOldLogs();
@@ -145,6 +147,25 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: APP_VERSION,
   });
+});
+
+// ------------------------------------------------------------------
+// POST /handle-email — manual trigger for one email-polling cycle (the
+// in-process interval in emailPoller.js already runs this automatically
+// every 2 minutes; this exists for ad-hoc testing/cron without minting an
+// admin JWT). Guarded by a shared secret since it sits outside /admin.
+// ------------------------------------------------------------------
+app.post('/handle-email', async (req, res) => {
+  if (!process.env.EMAIL_POLL_SECRET || req.headers['x-poll-secret'] !== process.env.EMAIL_POLL_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const results = await emailPoller.pollAllClients();
+    res.json({ results });
+  } catch (err) {
+    logError('POST /handle-email failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ------------------------------------------------------------------

@@ -53,3 +53,7 @@ export const getQuotes = (params = {}) =>
 
 export const getQuotePdfBlob = (id) =>
   apiClient.get(`/admin/quotes/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data);
+
+// --- Email Receptionist ---
+export const getGmailAuthUrl = (clientId) =>
+  apiClient.post(`/admin/clients/${clientId}/gmail-auth-url`).then((r) => r.data.url);

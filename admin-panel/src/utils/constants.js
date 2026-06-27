@@ -6,6 +6,7 @@ export const BOT_PERSONALITIES = ['Professional', 'Friendly', 'Formal', 'Casual'
 export const SERVICE_PACKAGES = [
   { value: 'ai_receptionist', label: 'AI Receptionist', price: 3000, features: ['vapi'] },
   { value: 'whatsapp_bot', label: 'WhatsApp Bot', price: 2500, features: ['whatsapp'] },
+  { value: 'email_receptionist', label: 'Email Receptionist', price: 2000, features: ['email'] },
   { value: 'full_bundle', label: 'Full Bundle', price: 5000, features: ['vapi', 'whatsapp'] },
 ];
 
