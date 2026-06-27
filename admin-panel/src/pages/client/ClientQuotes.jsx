@@ -200,8 +200,14 @@ export default function ClientQuotes() {
                   className="cursor-pointer hover:bg-panel-2"
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-cream-dim">{formatDateTime(quote.created_at)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-cream-dim" title={quote.channel === 'email' ? 'Email' : 'WhatsApp'}>
-                    {quote.channel === 'email' ? '📧' : '📱'}
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        quote.channel === 'email' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {quote.channel === 'email' ? '📧 Email Quote Request' : '📱 WhatsApp Quote Request'}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-cream">{quote.contact_number}</td>

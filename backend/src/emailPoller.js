@@ -10,6 +10,7 @@ const leadTagger = require('./leadTagger');
 const pdfGenerator = require('./pdfGenerator');
 const settingsManager = require('./settingsManager');
 const emailLogsManager = require('./emailLogsManager');
+const memory = require('./memory');
 const { notifyOwner } = require('./webhook');
 
 const POLL_INTERVAL_MS = 2 * 60 * 1000;
@@ -111,13 +112,22 @@ async function processClient(client) {
     try {
       const message = await gmailClient.getMessage(client, id);
 
-      const rawReply = await generateEmailReply(client, {
+      // Email threads get the same multi-turn memory as WhatsApp, keyed by
+      // the sender's address instead of a phone number, so a follow-up
+      // email with previously-missing quote details (name, size, etc.)
+      // is understood as a continuation rather than a fresh conversation.
+      const isNewThread = memory.getHistory(client.id, message.fromAddress).length === 0;
+      const userContent = isNewThread
+        ? `Subject: ${message.subject || '(no subject)'}\n\n${message.bodyText || '(empty email body)'}`
+        : message.bodyText || '(empty email body)';
+      memory.addMessage(client.id, message.fromAddress, 'user', userContent);
+
+      const rawReply = await generateEmailReply(client, memory.getHistory(client.id, message.fromAddress), {
         fromName: message.fromName,
-        subject: message.subject,
-        bodyText: message.bodyText,
       });
 
       const { text: replyText, quote } = quoteManager.extractQuoteRequest(rawReply);
+      memory.addMessage(client.id, message.fromAddress, 'assistant', replyText);
 
       if (quote) {
         await handleQuoteRequest(client, message.fromAddress, quote);

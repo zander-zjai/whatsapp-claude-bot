@@ -238,6 +238,13 @@ export default function ClientQuoteDetail() {
               <p className="font-mono text-xs text-cream-dim">{quote.contact_number}</p>
               <p className="mt-1 text-xs text-cream-dim">Requested: {formatDateTime(quote.created_at)}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    quote.channel === 'email' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                  }`}
+                >
+                  {quote.channel === 'email' ? '📧 Email Quote Request' : '📱 WhatsApp Quote Request'}
+                </span>
                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[quote.status] || 'bg-panel-2 text-cream-dim'}`}>
                   {quote.status}
                 </span>

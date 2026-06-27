@@ -14,10 +14,12 @@ const MAX_TOKENS = 1024;
  * can be added later by reusing the same [[QUOTE_REQUEST]] marker pattern
  * if there's demand for it.
  */
-function buildEmailSystemPrompt(client) {
+function buildEmailSystemPrompt(client, options = {}) {
   const parts = [
     client.system_prompt,
-    `You are replying to a customer email on behalf of ${client.name}. Write a complete, professional email reply: no chat-style abbreviations, a clear greeting using the sender's name if known, and a sign-off. Keep it concise — a few short paragraphs at most. Do not include a subject line in your reply; just write the email body.`,
+    `You are replying to a customer email on behalf of ${client.name}.${
+      options.fromName ? ` The customer's name is ${options.fromName}.` : ''
+    } Write a complete, professional email reply: no chat-style abbreviations, a clear greeting, and a sign-off. Keep it concise — a few short paragraphs at most. Do not include a subject line in your reply; just write the email body. This may be one message in an ongoing back-and-forth — use the prior messages below for context (e.g. don't re-ask for details the customer already gave).`,
   ];
 
   if (client.quote_requests_enabled) {
@@ -36,26 +38,19 @@ function buildEmailSystemPrompt(client) {
 
 /**
  * @param {object} client
- * @param {{ fromName: string|null, subject: string, bodyText: string }} email
+ * @param {Array} history - Prior messages [{ role, content }, ...], already
+ *   including the new user turn (mirrors claude.js's getClaudeReply).
+ * @param {{ fromName: string|null }} [options]
  * @returns {Promise<string>} The reply body text (no subject line).
  */
-async function generateEmailReply(client, email) {
+async function generateEmailReply(client, history, options = {}) {
   const anthropic = getAnthropicClient(resolveApiKey(client));
-
-  const userTurn = [
-    email.fromName ? `From: ${email.fromName}` : null,
-    `Subject: ${email.subject || '(no subject)'}`,
-    '',
-    email.bodyText || '(empty email body)',
-  ]
-    .filter((line) => line !== null)
-    .join('\n');
 
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: buildEmailSystemPrompt(client),
-    messages: [{ role: 'user', content: userTurn }],
+    system: buildEmailSystemPrompt(client, options),
+    messages: history,
   });
 
   if (response.usage) {
