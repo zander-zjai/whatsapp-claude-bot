@@ -76,6 +76,7 @@ export default function ClientConversations() {
   const initialTab = searchParams.get('priority') || 'all';
   const leadFilter = searchParams.get('lead');
   const awaitingFilter = searchParams.get('awaiting') === 'human';
+  const handoverFilter = searchParams.get('handover') === 'active';
   const [conversations, setConversations] = useState([]);
   const [tab, setTab] = useState(PRIORITY_TABS.some((t) => t.key === initialTab) ? initialTab : 'all');
   const [loading, setLoading] = useState(true);
@@ -146,7 +147,8 @@ export default function ClientConversations() {
       return c.priority === tab;
     })
     .filter((c) => !leadFilter || c.lead_temperature === leadFilter)
-    .filter((c) => !awaitingFilter || (c.awaiting_human && !c.handover_active));
+    .filter((c) => !awaitingFilter || (c.awaiting_human && !c.handover_active))
+    .filter((c) => !handoverFilter || c.handover_active);
   const counts = conversations.reduce((acc, c) => {
     const key = c.priority || 'none';
     acc[key] = (acc[key] || 0) + 1;
@@ -195,6 +197,23 @@ export default function ClientConversations() {
             onClick={() => {
               const next = new URLSearchParams(searchParams);
               next.delete('awaiting');
+              setSearchParams(next);
+            }}
+            className="font-medium underline underline-offset-2"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {handoverFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+          Showing conversations in active handover only.
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('handover');
               setSearchParams(next);
             }}
             className="font-medium underline underline-offset-2"

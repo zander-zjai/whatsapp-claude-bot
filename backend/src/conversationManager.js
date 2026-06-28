@@ -52,6 +52,7 @@ function getConversation(clientId, customerNumber) {
       customer_number: customerNumber,
       customer_name: null,
       handover_active: false,
+      handover_started_at: null,
       awaiting_human: false,
       last_message_at: null,
       last_message_preview: '',
@@ -110,6 +111,7 @@ function recordCustomerMessage(clientId, customerNumber, text) {
 function setHandover(clientId, customerNumber, active) {
   const conv = getConversation(clientId, customerNumber);
   conv.handover_active = Boolean(active);
+  conv.handover_started_at = active ? conv.handover_started_at || new Date().toISOString() : null;
   conv.awaiting_human = false;
   conv.updated_at = new Date().toISOString();
   persist();

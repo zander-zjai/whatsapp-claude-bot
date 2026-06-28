@@ -70,6 +70,16 @@ function formatDateTime(iso) {
   return new Date(iso).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function formatElapsed(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  if (hours < 1) return 'less than an hour ago';
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function ChannelSection({ icon, title, viewAllTo, children }) {
   return (
     <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
@@ -98,9 +108,11 @@ export default function ClientDashboard() {
   const [recentConversations, setRecentConversations] = useState([]);
   const [recentEmails, setRecentEmails] = useState([]);
   const [recentCalls, setRecentCalls] = useState([]);
+  const [activeHandovers, setActiveHandovers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [takingOverNumber, setTakingOverNumber] = useState(null);
+  const [releasingNumber, setReleasingNumber] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +131,7 @@ export default function ClientDashboard() {
         setRecentConversations(data.recent_conversations || []);
         setRecentEmails(data.recent_emails || []);
         setRecentCalls(data.recent_calls || []);
+        setActiveHandovers(data.active_handovers || []);
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err, 'Failed to load dashboard'));
       } finally {
@@ -144,6 +157,18 @@ export default function ClientDashboard() {
       // error handling if this fails for some reason.
     } finally {
       setTakingOverNumber(null);
+    }
+  }
+
+  async function handleRelease(customerNumber) {
+    setReleasingNumber(customerNumber);
+    try {
+      await setClientConversationHandover(customerNumber, false);
+      setActiveHandovers((prev) => prev.filter((c) => c.customer_number !== customerNumber));
+    } catch (err) {
+      // Best-effort from the dashboard.
+    } finally {
+      setReleasingNumber(null);
     }
   }
 
@@ -194,6 +219,13 @@ export default function ClientDashboard() {
               icon="🏆"
             />
             <LinkedStatsCard to="/client/calls" label="Calls Today" value={summary.calls_today} icon="📞" />
+            <LinkedStatsCard
+              to="/client/conversations?handover=active"
+              label="Active Handovers"
+              value={summary.active_handovers}
+              status={summary.active_handovers > 0 ? 'offline' : undefined}
+              icon="✋"
+            />
           </div>
 
           {awaitingHuman.length > 0 && (
@@ -226,6 +258,46 @@ export default function ClientDashboard() {
                       className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-60"
                     >
                       Take Over
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {activeHandovers.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-amber-400 uppercase tracking-wide">
+                  ✋ Zara Is Paused — You're Handling These ({activeHandovers.length})
+                </h3>
+              </div>
+              <p className="mb-3 text-xs text-amber-400/80">
+                Zara won't reply to these customers until you release the conversation back to her.
+              </p>
+              <ul className="space-y-2">
+                {activeHandovers.map((c) => (
+                  <li
+                    key={c.customer_number}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm"
+                  >
+                    <Link
+                      to={`/client/conversations/${encodeURIComponent(c.customer_number)}`}
+                      className="min-w-0 flex-1 hover:underline"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-cream">{c.customer_name || c.customer_number}</p>
+                        <p className="shrink-0 text-xs text-amber-400">{formatElapsed(c.handover_started_at)}</p>
+                      </div>
+                      <p className="truncate text-xs text-cream-dim">{c.last_message_preview}</p>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleRelease(c.customer_number)}
+                      disabled={releasingNumber === c.customer_number}
+                      className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-60"
+                    >
+                      Release to Zara
                     </button>
                   </li>
                 ))}
