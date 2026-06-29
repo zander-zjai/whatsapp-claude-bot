@@ -395,6 +395,8 @@ function sanitizeClientForPortal(client) {
     whatsapp_token,
     claude_api_key,
     client_password,
+    reset_token,
+    reset_token_expires_at,
     google_client_secret,
     google_refresh_token,
     gmail_refresh_token,
@@ -471,6 +473,39 @@ function setClientPasswordHash(id, hash) {
   return client;
 }
 
+/** Store a portal-password reset token + expiry (ISO string) for a client. */
+function setResetToken(id, token, expiresAt) {
+  const client = getClientById(id);
+  if (!client) return undefined;
+
+  client.reset_token = token;
+  client.reset_token_expires_at = expiresAt;
+  persist();
+  return client;
+}
+
+/** Clear a client's reset token (used once, or expired/invalidated). */
+function clearResetToken(id) {
+  const client = getClientById(id);
+  if (!client) return undefined;
+
+  client.reset_token = null;
+  client.reset_token_expires_at = null;
+  persist();
+  return client;
+}
+
+/** Find a client by an unexpired reset token. Returns undefined if not found or expired. */
+function getClientByResetToken(token) {
+  if (!token) return undefined;
+  return clients.find(
+    (c) =>
+      c.reset_token === token &&
+      c.reset_token_expires_at &&
+      new Date(c.reset_token_expires_at).getTime() > Date.now()
+  );
+}
+
 /**
  * Remove a client by id. Returns true if a client was removed, false if
  * no client matched the given id.
@@ -503,4 +538,7 @@ module.exports = {
   updatePortalSettings,
   updatePriceList,
   setClientPasswordHash,
+  setResetToken,
+  clearResetToken,
+  getClientByResetToken,
 };

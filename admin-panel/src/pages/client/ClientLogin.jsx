@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useClientAuth } from '../../context/ClientAuthContext';
 import { getErrorMessage } from '../../api/client';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -85,6 +85,12 @@ export default function ClientLogin() {
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <p className="text-center text-sm">
+            <Link to="/client/forgot-password" className="text-cream-dim hover:underline">
+              Forgot password?
+            </Link>
+          </p>
         </form>
       </div>
     </div>

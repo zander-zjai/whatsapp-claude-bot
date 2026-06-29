@@ -1,9 +1,10 @@
 'use strict';
 
 const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { log } = require('./logger');
+const { log, logError } = require('./logger');
 const clientManager = require('./clientManager');
 const clientAuth = require('./clientAuth');
 const conversationManager = require('./conversationManager');
@@ -12,6 +13,8 @@ const emailLogsManager = require('./emailLogsManager');
 const quoteManager = require('./quoteManager');
 const quoteActions = require('./quoteActions');
 const mediaManager = require('./mediaManager');
+const emailNotifier = require('./emailNotifier');
+const settingsManager = require('./settingsManager');
 
 const router = express.Router();
 
@@ -43,6 +46,69 @@ router.post('/login', loginLimiter, (req, res) => {
   const token = clientAuth.issueClientToken(client.id);
   log(`Client portal login: ${client.name}`);
   res.json({ token, client: clientManager.sanitizeClientForPortal(client) });
+});
+
+// ------------------------------------------------------------------
+// Forgot / reset password (public). Same rate limit shape as login —
+// reuse loginLimiter so this can't be used to brute-force or spam emails.
+// ------------------------------------------------------------------
+const RESET_TOKEN_VALIDITY_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * POST /client/forgot-password — always responds with a generic success
+ * message regardless of whether the email matches a client, so this can't
+ * be used to enumerate which businesses have an account. If it does match,
+ * emails a one-time reset link to the client's contact_email.
+ */
+router.post('/forgot-password', loginLimiter, async (req, res) => {
+  const { email } = req.body || {};
+  const genericResponse = { message: "If that email is registered, we've sent a password reset link." };
+
+  if (!email) {
+    return res.status(400).json({ error: 'email is required' });
+  }
+
+  const client = clientManager.getClientByEmail(email);
+  if (client) {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_VALIDITY_MS).toISOString();
+    clientManager.setResetToken(client.id, token, expiresAt);
+
+    const resetUrl = `${settingsManager.getSettings().client_portal_url}/client/reset-password?token=${token}`;
+    try {
+      await emailNotifier.sendOwnerEmail(
+        client,
+        'Reset your ZJAI client portal password',
+        `Hi ${client.contact_person || ''},\n\nWe received a request to reset your client portal password. Click the link below to set a new one — it's valid for 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
+      );
+    } catch (err) {
+      logError(`[${client.name}] Failed to send password reset email:`, err.message);
+    }
+  }
+
+  res.json(genericResponse);
+});
+
+/** POST /client/reset-password — sets a new password given a valid, unexpired reset token. */
+router.post('/reset-password', loginLimiter, (req, res) => {
+  const { token, password } = req.body || {};
+
+  if (!token || !password) {
+    return res.status(400).json({ error: 'token and password are required' });
+  }
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'password must be at least 8 characters' });
+  }
+
+  const client = clientManager.getClientByResetToken(token);
+  if (!client) {
+    return res.status(400).json({ error: 'This reset link is invalid or has expired.' });
+  }
+
+  clientAuth.setClientPassword(client.id, password);
+  clientManager.clearResetToken(client.id);
+  log(`Client portal password reset via self-service for "${client.name}"`);
+  res.json({ success: true });
 });
 
 // Everything below this line requires a valid client JWT, and req.clientId /

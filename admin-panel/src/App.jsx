@@ -12,6 +12,8 @@ import QuoteRequests from './pages/QuoteRequests';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import ClientLogin from './pages/client/ClientLogin';
+import ClientForgotPassword from './pages/client/ClientForgotPassword';
+import ClientResetPassword from './pages/client/ClientResetPassword';
 import ClientDashboard from './pages/client/ClientDashboard';
 import ClientConversations from './pages/client/ClientConversations';
 import ClientConversationDetail from './pages/client/ClientConversationDetail';
@@ -41,6 +43,8 @@ export default function App() {
       </Route>
 
       <Route path="/client/login" element={<ClientLogin />} />
+      <Route path="/client/forgot-password" element={<ClientForgotPassword />} />
+      <Route path="/client/reset-password" element={<ClientResetPassword />} />
 
       <Route element={<ClientProtectedRoute />}>
         <Route path="/client/dashboard" element={<ClientDashboard />} />

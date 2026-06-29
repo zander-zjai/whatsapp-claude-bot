@@ -4,6 +4,12 @@ import { clientPortalApi } from './clientPortalClient';
 export const clientLogin = (email, password) =>
   clientPortalApi.post('/client/login', { email, password }).then((r) => r.data);
 
+export const clientForgotPassword = (email) =>
+  clientPortalApi.post('/client/forgot-password', { email }).then((r) => r.data);
+
+export const clientResetPassword = (token, password) =>
+  clientPortalApi.post('/client/reset-password', { token, password }).then((r) => r.data);
+
 // --- Dashboard ---
 export const getClientMe = () => clientPortalApi.get('/client/me').then((r) => r.data);
 
