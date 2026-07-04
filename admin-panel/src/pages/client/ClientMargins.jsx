@@ -50,7 +50,7 @@ export default function ClientMargins() {
     setSavingDefault(true);
     try {
       const val = parseFloat(defaultDraft);
-      if (isNaN(val) || val < 0 || val > 100) { setDefaultError('Enter a value between 0 and 100'); return; }
+      if (isNaN(val) || val < -100 || val > 100) { setDefaultError('Enter a value between -100 and 100'); return; }
       await updateDefaultMargin(val);
       setDefaultMargin(val);
       setDefaultSaved(true);
@@ -67,7 +67,7 @@ export default function ClientMargins() {
     setAddError('');
     const mp = parseFloat(form.margin_percent);
     if (!form.phone_number) { setAddError('Phone number is required'); return; }
-    if (isNaN(mp) || mp < 0 || mp > 100) { setAddError('Margin must be 0–100'); return; }
+    if (isNaN(mp) || mp < -100 || mp > 100) { setAddError('Enter a value between -100 and 100 (negative = discount off list price)'); return; }
     setAdding(true);
     try {
       const updated = await addClientMargin({ label: form.label, phone_number: form.phone_number, margin_percent: mp });
@@ -102,13 +102,13 @@ export default function ClientMargins() {
         <div className="space-y-6">
           {/* Default margin */}
           <div className="rounded-xl border border-line bg-panel p-4 shadow-sm">
-            <h2 className="mb-1 text-sm font-semibold text-cream">Default margin</h2>
-            <p className="mb-3 text-xs text-cream-dim">Applied to all customers unless a per-customer override is set. 0% = no markup.</p>
+            <h2 className="mb-1 text-sm font-semibold text-cream">Default price adjustment</h2>
+            <p className="mb-3 text-xs text-cream-dim">Your price list already includes your margin. Use this to adjust further: <strong className="text-cream">positive % = charge more</strong>, <strong className="text-cream">negative % = give a discount</strong>. 0% = sell at list price.</p>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <input
                   type="number"
-                  min="0"
+                  min="-100"
                   max="100"
                   step="0.1"
                   value={defaultDraft}
@@ -128,7 +128,7 @@ export default function ClientMargins() {
 
           {/* Customer-specific margins */}
           <div className="rounded-xl border border-line bg-panel p-4 shadow-sm">
-            <h2 className="mb-1 text-sm font-semibold text-cream">Per-customer margins</h2>
+            <h2 className="mb-1 text-sm font-semibold text-cream">Per-customer price adjustments</h2>
             <p className="mb-4 text-xs text-cream-dim">Override the default margin for specific customers matched by WhatsApp number.</p>
 
             {margins.length === 0 ? (
@@ -170,7 +170,7 @@ export default function ClientMargins() {
                   onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))}
                   className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none" />
                 <div className="relative">
-                  <input type="number" min="0" max="100" step="0.1" placeholder="Margin %" value={form.margin_percent} required
+                  <input type="number" min="-100" max="100" step="0.1" placeholder="Margin %" value={form.margin_percent} required
                     onChange={(e) => setForm((f) => ({ ...f, margin_percent: e.target.value }))}
                     className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2 pr-8 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-cream-dim">%</span>
