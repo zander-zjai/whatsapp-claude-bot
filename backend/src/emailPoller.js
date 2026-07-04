@@ -35,8 +35,9 @@ async function handleQuoteRequest(client, fromAddress, quote) {
   }
 
   const isPdf = quoteManager.isPdfQuoteEnabled(client);
+  const { marginPercent, marginId } = clientManager.resolveMarginForCustomer(client, fromAddress);
   const calc = isPdf
-    ? quoteManager.calculateQuoteTotal(client.price_list, quote.line_items)
+    ? quoteManager.calculateQuoteTotal(client.price_list, quote.line_items, marginPercent)
     : { items: [], total: 0 };
 
   const isRepeatCustomer = quoteManager
@@ -65,6 +66,8 @@ async function handleQuoteRequest(client, fromAddress, quote) {
       quantity: quote.quantity,
       line_items: calc.items,
       total: calc.total,
+      margin_percent: marginPercent || 0,
+      margin_id: marginId || null,
       status: needsPricing ? 'needs_pricing' : 'pending',
     });
 

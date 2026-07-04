@@ -40,6 +40,24 @@ export const getClientQuote = (id) => clientPortalApi.get(`/client/quotes/${id}`
 export const updateClientQuote = (id, data) =>
   clientPortalApi.patch(`/client/quotes/${id}`, data).then((r) => r.data.quote);
 
+export const getClientQuoteAnalytics = () =>
+  clientPortalApi.get('/client/quotes/analytics').then((r) => r.data.analytics);
+
+export const getCustomerQuoteHistory = (identifier) =>
+  clientPortalApi.get(`/client/customers/${encodeURIComponent(identifier)}/quotes`).then((r) => r.data);
+
+// --- Customer margins ---
+export const getClientMargins = () => clientPortalApi.get('/client/margins').then((r) => r.data);
+
+export const addClientMargin = (data) =>
+  clientPortalApi.post('/client/margins', data).then((r) => r.data.margins);
+
+export const deleteClientMargin = (id) =>
+  clientPortalApi.delete(`/client/margins/${id}`).then((r) => r.data.margins);
+
+export const updateDefaultMargin = (marginPercent) =>
+  clientPortalApi.patch('/client/margins/default', { margin_percent: marginPercent }).then((r) => r.data);
+
 export const getClientQuotePdfBlob = (id) =>
   clientPortalApi.get(`/client/quotes/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data);
 

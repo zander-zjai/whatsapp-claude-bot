@@ -7,6 +7,7 @@ const quoteManager = require('./quoteManager');
 const conversationManager = require('./conversationManager');
 const { sendWhatsAppMessage } = require('./whatsapp');
 const { formatCurrency, formatDate } = require('./pdfGenerator');
+const settingsManager = require('./settingsManager');
 
 function buildExpiryReminderText(client, quote) {
   const daysLeft = Math.max(
@@ -94,9 +95,42 @@ async function runSilenceFollowups() {
   }
 }
 
+/**
+ * Expire overdue quotes then notify Robin for each newly-expired one via
+ * WhatsApp, so he can decide to follow up or regenerate a new quote.
+ */
+async function runExpiryAndOwnerNotifications() {
+  const nowExpired = quoteManager.expireOverdueQuotes();
+  const toNotify = quoteManager.getQuotesNeedingExpiryNotification();
+  if (toNotify.length === 0 && nowExpired.length === 0) return;
+
+  log(`[quoteReminders] ${nowExpired.length} quote(s) newly expired; ${toNotify.length} owner notification(s) pending`);
+
+  for (const quote of toNotify) {
+    const client = clientManager.getClientById(quote.client_id);
+    if (!client) continue;
+
+    const msg =
+      `⏰ Quote expired — ${quote.name || quote.customer_number} (${quote.item_description || 'quote'}) ` +
+      `expired without a response on ${formatDate(quote.valid_until)}. ` +
+      `Do you want to follow up or regenerate a new quote? View quote: ${settingsManager.getSettings().client_portal_url}/client/quotes/${quote.id}`;
+
+    try {
+      if (client.owner_phone) {
+        await sendWhatsAppMessage(client, client.owner_phone, msg);
+      }
+      quoteManager.markExpiryOwnerNotified(quote.id);
+      log(`[quoteReminders] Notified owner of expired quote ${quote.id}`);
+    } catch (err) {
+      logError(`[quoteReminders] Failed to send expiry owner notification for ${quote.id}:`, err.message);
+    }
+  }
+}
+
 async function runAll() {
+  await runExpiryAndOwnerNotifications();
   await runExpiryReminders();
   await runSilenceFollowups();
 }
 
-module.exports = { runExpiryReminders, runSilenceFollowups, runAll };
+module.exports = { runExpiryReminders, runSilenceFollowups, runExpiryAndOwnerNotifications, runAll };

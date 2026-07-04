@@ -48,6 +48,8 @@ const EDITABLE_FIELDS = [
   'email_receptionist_enabled',
   'email_address',
   'gmail_refresh_token',
+  'default_margin',
+  'customer_margins',
 ];
 
 const REQUIRED_FIELDS = [
@@ -111,6 +113,8 @@ const DEFAULTS = {
   email_receptionist_enabled: false,
   email_address: '',
   gmail_refresh_token: '',
+  default_margin: 0,
+  customer_margins: [],
 };
 
 // Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
@@ -473,6 +477,75 @@ function setClientPasswordHash(id, hash) {
   return client;
 }
 
+// ------------------------------------------------------------------
+// Customer margin helpers — stored as client.customer_margins, an array of
+// { id, label, phone_number, margin_percent, created_at } records. The phone_number
+// field is matched (normalized) against the incoming customer number at
+// quote-generation time; label is a display name for the portal.
+// ------------------------------------------------------------------
+
+const { normalizeNumber: _normalize } = require('./phone');
+
+/**
+ * Resolve the margin percentage to apply for a given customer number.
+ * Returns the per-customer margin if one is configured, otherwise the
+ * client's default_margin, otherwise 0.
+ *
+ * @returns {{ marginPercent: number, marginId: string|null }}
+ */
+function resolveMarginForCustomer(client, customerNumber) {
+  const margins = Array.isArray(client.customer_margins) ? client.customer_margins : [];
+  const normalized = _normalize(String(customerNumber || ''));
+  const match = margins.find(
+    (m) => m.phone_number && _normalize(String(m.phone_number)) === normalized
+  );
+  if (match) return { marginPercent: Number(match.margin_percent) || 0, marginId: match.id };
+  return { marginPercent: Number(client.default_margin) || 0, marginId: null };
+}
+
+/** Add or update a customer margin record. If a record with matching phone_number exists,
+ *  it is replaced; otherwise a new one is appended. */
+function addCustomerMargin(clientId, { label, phone_number, margin_percent }) {
+  const client = getClientById(clientId);
+  if (!client) return undefined;
+
+  if (!Array.isArray(client.customer_margins)) client.customer_margins = [];
+
+  const normalized = _normalize(String(phone_number || ''));
+  const existing = client.customer_margins.find(
+    (m) => _normalize(String(m.phone_number || '')) === normalized
+  );
+
+  if (existing) {
+    existing.label = label || existing.label;
+    existing.margin_percent = Number(margin_percent) || 0;
+    existing.updated_at = new Date().toISOString();
+  } else {
+    client.customer_margins.push({
+      id: require('crypto').randomUUID(),
+      label: label || '',
+      phone_number: phone_number || '',
+      margin_percent: Number(margin_percent) || 0,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  client.updated_at = new Date().toISOString();
+  persist();
+  return client.customer_margins;
+}
+
+/** Remove a customer margin by its id. */
+function removeCustomerMargin(clientId, marginId) {
+  const client = getClientById(clientId);
+  if (!client || !Array.isArray(client.customer_margins)) return undefined;
+
+  client.customer_margins = client.customer_margins.filter((m) => m.id !== marginId);
+  client.updated_at = new Date().toISOString();
+  persist();
+  return client.customer_margins;
+}
+
 /** Store a portal-password reset token + expiry (ISO string) for a client. */
 function setResetToken(id, token, expiresAt) {
   const client = getClientById(id);
@@ -541,4 +614,7 @@ module.exports = {
   setResetToken,
   clearResetToken,
   getClientByResetToken,
+  resolveMarginForCustomer,
+  addCustomerMargin,
+  removeCustomerMargin,
 };

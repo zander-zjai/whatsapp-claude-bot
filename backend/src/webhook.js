@@ -415,7 +415,7 @@ function buildPdfQuoteNotification(record, score) {
  * zero-rand quote can never be one-click approved and sent to a customer.
  * No PDF is generated for it either, since there's nothing real to show.
  */
-async function handleTier2Quote(client, from, quote, { items, total }, score) {
+async function handleTier2Quote(client, from, quote, { items, total, marginPercent, marginId }, score) {
   const needsPricing = total <= 0;
 
   const record = quoteManager.addPdfQuote({
@@ -429,6 +429,8 @@ async function handleTier2Quote(client, from, quote, { items, total }, score) {
     quantity: quote.quantity,
     line_items: items,
     total,
+    margin_percent: marginPercent || 0,
+    margin_id: marginId || null,
     status: needsPricing ? 'needs_pricing' : 'pending',
   });
 
@@ -795,8 +797,9 @@ async function processMessage({
     log(`[${client.name}] Skipped duplicate quote request from ${maskPhone(from)} for "${quote.item_description}"`);
   } else if (quote) {
     const isPdf = quoteManager.isPdfQuoteEnabled(client);
+    const { marginPercent, marginId } = clientManager.resolveMarginForCustomer(client, from);
     const calc = isPdf
-      ? quoteManager.calculateQuoteTotal(client.price_list, quote.line_items)
+      ? quoteManager.calculateQuoteTotal(client.price_list, quote.line_items, marginPercent)
       : { items: [], total: 0 };
 
     const isRepeatCustomer = quoteManager
@@ -815,7 +818,7 @@ async function processMessage({
     conversationManager.setLeadTag(client.id, from, score);
 
     if (isPdf) {
-      await handleTier2Quote(client, from, quote, calc, score);
+      await handleTier2Quote(client, from, quote, { ...calc, marginPercent, marginId }, score);
     } else {
       quoteManager.addQuote({
         client_id: client.id,

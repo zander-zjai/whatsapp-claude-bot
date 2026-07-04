@@ -92,4 +92,55 @@ function rejectQuote(quote) {
   return quoteManager.setQuoteStatus(quote.id, 'rejected');
 }
 
-module.exports = { sendQuotePdf, approveQuote, rejectQuote };
+/**
+ * Save a revision to a quote, regenerate the PDF with the new line items,
+ * and send the updated quote to the customer. The previous line items are
+ * preserved in the quote's revisions array for the audit trail.
+ */
+async function reviseAndSendQuote(client, quote, { lineItems, total, notes, eta }) {
+  const pdfGenerator = require('./pdfGenerator');
+  quoteManager.saveRevision(quote.id, { lineItems, total, notes });
+  if (eta !== undefined) quoteManager.setQuoteEta(quote.id, eta);
+
+  const updatedQuote = quoteManager.getQuoteById(quote.id);
+
+  let pdfBuffer;
+  try {
+    pdfBuffer = await pdfGenerator.generateQuotePdf(client, updatedQuote);
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Failed to regenerate revised PDF:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Failed to regenerate revised PDF`, err);
+    return { ok: false, reason: 'pdf_generation_failed' };
+  }
+
+  quoteManager.savePdfFile(quote.id, pdfBuffer);
+
+  const baseCaption = buildQuoteCaption(client, updatedQuote);
+  const caption = notes ? `${baseCaption}\n\n📝 Note from ${client.name}: ${notes}` : baseCaption;
+  const filename = `Quote-${quote.id.slice(0, 8)}.pdf`;
+
+  try {
+    if (updatedQuote.channel === 'email') {
+      const gmailClient = require('./gmailClient');
+      await gmailClient.sendReply(client, {
+        to: updatedQuote.customer_number,
+        subject: `Your updated quote from ${client.name}`,
+        bodyText: caption,
+        attachment: { buffer: pdfBuffer, filename, mimeType: 'application/pdf' },
+      });
+    } else {
+      await sendWhatsAppDocument(client, updatedQuote.customer_number, pdfBuffer, filename, caption);
+    }
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${client.name}] Failed to send revised quote:`, detail);
+    errorLogger.logErrorToFile(`[${client.name}] Failed to send revised quote`, err);
+    return { ok: false, reason: 'send_failed' };
+  }
+
+  quoteManager.setQuoteStatus(quote.id, 'sent');
+  return { ok: true };
+}
+
+module.exports = { sendQuotePdf, approveQuote, rejectQuote, reviseAndSendQuote };

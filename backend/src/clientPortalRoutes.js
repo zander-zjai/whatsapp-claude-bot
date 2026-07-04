@@ -374,10 +374,8 @@ router.get('/attachments/:id/file', (req, res) => {
 
 /**
  * PATCH /client/quotes/:id — update a quote.
- * - { action: 'approve' | 'reject' } — Tier 2 only, while status is 'pending'.
- *   Mirrors the #approve/#reject WhatsApp commands.
- * - { status: 'pending' | 'quoted' | 'won' | 'lost' } — mark the outcome of
- *   any quote once the job has been discussed/completed.
+ * Actions: approve | reject | revise
+ * Status overrides: pending | quoted | won | lost | accepted | declined
  */
 router.patch('/quotes/:id', async (req, res) => {
   const quote = quoteManager.getQuoteById(req.params.id);
@@ -385,7 +383,7 @@ router.patch('/quotes/:id', async (req, res) => {
     return res.status(404).json({ error: 'Quote not found' });
   }
 
-  const { action, status, eta, payment_received: paymentReceived } = req.body || {};
+  const { action, status, eta, payment_received: paymentReceived, line_items, notes } = req.body || {};
 
   if (paymentReceived !== undefined) {
     const updated = quoteManager.setPaymentReceived(quote.id, paymentReceived);
@@ -393,14 +391,15 @@ router.patch('/quotes/:id', async (req, res) => {
   }
 
   if (action) {
-    if (action !== 'approve' && action !== 'reject') {
-      return res.status(400).json({ error: 'action must be "approve" or "reject"' });
-    }
-    if (quote.tier !== 2 || quote.status !== 'pending') {
-      return res.status(400).json({ error: 'Only pending Tier 2 quotes can be approved or rejected' });
+    if (!['approve', 'reject', 'revise'].includes(action)) {
+      return res.status(400).json({ error: 'action must be "approve", "reject", or "revise"' });
     }
 
     if (action === 'approve') {
+      const approvableStatuses = ['pending', 'revised', 'needs_pricing'];
+      if (quote.tier !== 2 || !approvableStatuses.includes(quote.status)) {
+        return res.status(400).json({ error: 'Only pending or revised Tier 2 quotes can be approved' });
+      }
       const result = await quoteActions.approveQuote(req.client, quote, eta);
       if (!result.ok) {
         const message =
@@ -410,16 +409,34 @@ router.patch('/quotes/:id', async (req, res) => {
         return res.status(502).json({ error: message, quote: quoteManager.getQuoteById(quote.id) });
       }
       log(`Client portal: ${req.client.name} approved quote for ${quote.name}`);
-    } else {
+
+    } else if (action === 'reject') {
       quoteActions.rejectQuote(quote);
       log(`Client portal: ${req.client.name} rejected quote for ${quote.name}`);
+
+    } else if (action === 'revise') {
+      if (quote.tier !== 2) {
+        return res.status(400).json({ error: 'Only Tier 2 quotes can be revised' });
+      }
+      if (!Array.isArray(line_items) || line_items.length === 0) {
+        return res.status(400).json({ error: 'line_items are required for a revision' });
+      }
+      const { items, total } = quoteManager.recalculateRevisedItems(line_items);
+      const result = await quoteActions.reviseAndSendQuote(req.client, quote, { lineItems: items, total, notes, eta });
+      if (!result.ok) {
+        const message = result.reason === 'pdf_generation_failed'
+          ? 'Failed to regenerate the PDF. Please try again.'
+          : 'Failed to send the revised quote. Please try again.';
+        return res.status(502).json({ error: message, quote: quoteManager.getQuoteById(quote.id) });
+      }
+      log(`Client portal: ${req.client.name} revised and sent quote for ${quote.name}`);
     }
 
     return res.json({ quote: quoteManager.getQuoteById(quote.id) });
   }
 
   if (status) {
-    const ALLOWED_STATUSES = ['pending', 'quoted', 'won', 'lost'];
+    const ALLOWED_STATUSES = ['pending', 'quoted', 'won', 'lost', 'accepted', 'declined'];
     if (!ALLOWED_STATUSES.includes(status)) {
       return res.status(400).json({ error: `status must be one of: ${ALLOWED_STATUSES.join(', ')}` });
     }
@@ -445,6 +462,68 @@ router.get('/quotes/:id/pdf', (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="quote-${quote.id.slice(0, 8)}.pdf"`);
   fs.createReadStream(pdfPath).pipe(res);
+});
+
+// ------------------------------------------------------------------
+// Quote analytics + customer quote history
+// ------------------------------------------------------------------
+
+/** GET /client/quotes/analytics — monthly summary stats for this client's quotes. */
+router.get('/quotes/analytics', (req, res) => {
+  res.json({ analytics: quoteManager.getQuoteAnalytics(req.clientId) });
+});
+
+/**
+ * GET /client/customers/:identifier/quotes — all quotes ever for a specific
+ * customer (identified by their phone number or email address).
+ */
+router.get('/customers/:identifier/quotes', (req, res) => {
+  const identifier = decodeURIComponent(req.params.identifier);
+  const quotes = quoteManager.getQuotesForCustomer(req.clientId, identifier);
+  const totalValue = quotes.reduce((s, q) => s + (Number(q.total) || 0), 0);
+  res.json({ quotes, total_value: totalValue, customer: identifier });
+});
+
+// ------------------------------------------------------------------
+// Customer margins
+// ------------------------------------------------------------------
+
+/** GET /client/margins — list all customer-specific margins for this client. */
+router.get('/margins', (req, res) => {
+  res.json({
+    margins: req.client.customer_margins || [],
+    default_margin: req.client.default_margin || 0,
+  });
+});
+
+/** POST /client/margins — add or update a customer margin. */
+router.post('/margins', (req, res) => {
+  const { label, phone_number, margin_percent } = req.body || {};
+  if (!phone_number) {
+    return res.status(400).json({ error: 'phone_number is required' });
+  }
+  if (margin_percent === undefined || margin_percent === null) {
+    return res.status(400).json({ error: 'margin_percent is required' });
+  }
+  const margins = clientManager.addCustomerMargin(req.clientId, { label, phone_number, margin_percent });
+  res.json({ margins });
+});
+
+/** DELETE /client/margins/:id — remove a customer margin by id. */
+router.delete('/margins/:id', (req, res) => {
+  const margins = clientManager.removeCustomerMargin(req.clientId, req.params.id);
+  if (!margins) return res.status(404).json({ error: 'Margin not found' });
+  res.json({ margins });
+});
+
+/** PATCH /client/margins/default — update the default margin percentage. */
+router.patch('/margins/default', (req, res) => {
+  const { margin_percent } = req.body || {};
+  if (margin_percent === undefined || margin_percent === null) {
+    return res.status(400).json({ error: 'margin_percent is required' });
+  }
+  const updated = clientManager.updateClient(req.clientId, { default_margin: Number(margin_percent) || 0 });
+  res.json({ default_margin: updated ? updated.default_margin : 0 });
 });
 
 // ------------------------------------------------------------------

@@ -19,6 +19,8 @@ import ClientConversations from './pages/client/ClientConversations';
 import ClientConversationDetail from './pages/client/ClientConversationDetail';
 import ClientQuotes from './pages/client/ClientQuotes';
 import ClientQuoteDetail from './pages/client/ClientQuoteDetail';
+import ClientMargins from './pages/client/ClientMargins';
+import ClientCustomerQuotes from './pages/client/ClientCustomerQuotes';
 import ClientPriceList from './pages/client/ClientPriceList';
 import ClientSettings from './pages/client/ClientSettings';
 import ClientCallLogs from './pages/client/ClientCallLogs';
@@ -55,6 +57,8 @@ export default function App() {
         <Route path="/client/conversations/:customerNumber" element={<ClientConversationDetail />} />
         <Route path="/client/quotes" element={<ClientQuotes />} />
         <Route path="/client/quotes/:quoteId" element={<ClientQuoteDetail />} />
+        <Route path="/client/margins" element={<ClientMargins />} />
+        <Route path="/client/customers/:identifier/quotes" element={<ClientCustomerQuotes />} />
         <Route path="/client/pricelist" element={<ClientPriceList />} />
         <Route path="/client/settings" element={<ClientSettings />} />
       </Route>

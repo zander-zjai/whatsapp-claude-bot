@@ -213,7 +213,7 @@ function getMostRecentPendingQuote(clientId) {
   return undefined;
 }
 
-const EXPIRY_REMINDER_WINDOW_HOURS = 48;
+const EXPIRY_REMINDER_WINDOW_HOURS = 72; // 3-day reminder per spec
 
 /**
  * Sent Tier 2 quotes whose valid_until falls within the next
@@ -327,19 +327,22 @@ function findPriceListEntry(priceList, itemName) {
 
 /**
  * Match Claude-proposed line items against a client's price list, recomputing
- * unit prices and line totals from the price list (not from whatever numbers
- * Claude may have guessed) so the PDF reflects the business's actual pricing.
+ * unit prices and line totals from the price list. An optional marginPercent
+ * (e.g. 15 for 15%) is applied on top of each base unit price.
  *
  * @param {Array<{item: string, unit: string, price: number}>} priceList
  * @param {Array<{item: string, quantity: number}>} lineItems
- * @returns {{ items: Array<{item: string, unit: string, quantity: number, unit_price: number, line_total: number}>, total: number }}
+ * @param {number} [marginPercent=0]
+ * @returns {{ items: Array, total: number }}
  */
-function calculateQuoteTotal(priceList, lineItems) {
+function calculateQuoteTotal(priceList, lineItems, marginPercent = 0) {
   const list = Array.isArray(priceList) ? priceList : [];
+  const multiplier = 1 + (Number(marginPercent) || 0) / 100;
 
   const items = (Array.isArray(lineItems) ? lineItems : []).map((requested) => {
     const match = findPriceListEntry(list, requested.item);
-    const unitPrice = match ? Number(match.price) || 0 : 0;
+    const basePrice = match ? Number(match.price) || 0 : 0;
+    const unitPrice = round2(basePrice * multiplier);
     const quantity = Number(requested.quantity) || 0;
     return {
       item: match ? match.item : requested.item,
@@ -352,6 +355,110 @@ function calculateQuoteTotal(priceList, lineItems) {
 
   const total = round2(items.reduce((sum, item) => sum + item.line_total, 0));
   return { items, total };
+}
+
+/**
+ * Recalculate totals for revised line items where the owner has manually
+ * set unit prices. Takes prices as-is — no price list matching, no margin.
+ */
+function recalculateRevisedItems(lineItems) {
+  const items = (Array.isArray(lineItems) ? lineItems : []).map((li) => {
+    const unitPrice = round2(Number(li.unit_price) || 0);
+    const quantity = Number(li.quantity) || 0;
+    return {
+      item: String(li.item || ''),
+      unit: String(li.unit || ''),
+      quantity,
+      unit_price: unitPrice,
+      line_total: round2(unitPrice * quantity),
+    };
+  });
+  const total = round2(items.reduce((sum, item) => sum + item.line_total, 0));
+  return { items, total };
+}
+
+/**
+ * Save a revision to an existing quote. The current line items are pushed
+ * into a revisions array for the audit trail, then the quote is updated
+ * with the revised figures and its status set to 'revised'.
+ */
+function saveRevision(id, { lineItems, total, notes }) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+
+  if (!Array.isArray(quote.revisions)) quote.revisions = [];
+  quote.revisions.push({
+    revised_at: new Date().toISOString(),
+    line_items: quote.line_items,
+    total: quote.total,
+    notes: quote.revision_notes || null,
+  });
+
+  quote.line_items = lineItems;
+  quote.total = total;
+  quote.revision_notes = notes || null;
+  quote.status = 'revised';
+  quote.updated_at = new Date().toISOString();
+  persist();
+  return quote;
+}
+
+/** Mark any overdue Tier 2 quotes as expired. Returns the newly-expired records. */
+function expireOverdueQuotes() {
+  const now = Date.now();
+  const actionable = new Set(['pending', 'sent', 'revised', 'needs_pricing']);
+  const expired = [];
+
+  for (const q of quotes) {
+    if (q.tier !== 2 || !actionable.has(q.status)) continue;
+    if (q.valid_until && new Date(q.valid_until).getTime() < now) {
+      q.status = 'expired';
+      q.updated_at = new Date().toISOString();
+      expired.push(q);
+    }
+  }
+
+  if (expired.length > 0) persist();
+  return expired;
+}
+
+/** All quotes for a specific customer number under a client, newest first. */
+function getQuotesForCustomer(clientId, customerNumber) {
+  return quotes
+    .filter((q) => q.client_id === clientId && q.customer_number === customerNumber)
+    .slice()
+    .reverse();
+}
+
+/** Monthly analytics summary for a client's Tier 2 quotes. */
+function getQuoteAnalytics(clientId) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const clientQuotes = quotes.filter((q) => q.client_id === clientId && q.tier === 2);
+  const thisMonth = clientQuotes.filter((q) => new Date(q.created_at).getTime() >= monthStart);
+
+  const totalValue = thisMonth.reduce((s, q) => s + (Number(q.total) || 0), 0);
+  const accepted = thisMonth.filter((q) => ['won', 'accepted'].includes(q.status)).length;
+  const pending = thisMonth.filter((q) => ['pending', 'sent', 'revised'].includes(q.status)).length;
+  const declined = thisMonth.filter((q) => ['rejected', 'declined', 'lost'].includes(q.status)).length;
+  const expired = thisMonth.filter((q) => q.status === 'expired').length;
+  const conversionRate = thisMonth.length > 0 ? Math.round((accepted / thisMonth.length) * 100) : 0;
+
+  return { total_quotes: thisMonth.length, total_value: totalValue, accepted, pending, declined, expired, conversion_rate: conversionRate };
+}
+
+/** Expired quotes that haven't yet had the owner notified. */
+function getQuotesNeedingExpiryNotification() {
+  return quotes.filter((q) => q.tier === 2 && q.status === 'expired' && !q.expiry_owner_notified);
+}
+
+/** Mark that the owner has been notified of this quote's expiry. */
+function markExpiryOwnerNotified(id) {
+  const quote = getQuoteById(id);
+  if (!quote) return undefined;
+  quote.expiry_owner_notified = true;
+  persist();
+  return quote;
 }
 
 // ------------------------------------------------------------------
@@ -450,10 +557,14 @@ const STATUS_DESCRIPTIONS = {
   pending: 'still awaiting approval from our team',
   approved: 'approved and about to be sent to you',
   sent: 'sent to you and awaiting your decision',
+  revised: 'being revised by our team — an updated quote is coming',
   rejected: 'being reviewed manually by our team — someone will follow up',
+  declined: 'declined — please reach out if you change your mind',
+  accepted: 'accepted — thank you for your business',
   quoted: 'quoted and awaiting your decision',
   won: 'confirmed — thank you for your business',
   lost: 'closed out',
+  expired: 'expired — please reach out for a new quote',
 };
 
 /**
@@ -500,6 +611,13 @@ module.exports = {
   getLatestQuoteForCustomer,
   describeQuoteForCustomer,
   calculateQuoteTotal,
+  recalculateRevisedItems,
+  saveRevision,
+  expireOverdueQuotes,
+  getQuotesForCustomer,
+  getQuoteAnalytics,
+  getQuotesNeedingExpiryNotification,
+  markExpiryOwnerNotified,
   getPdfFilePath,
   savePdfFile,
   readPdfFile,
