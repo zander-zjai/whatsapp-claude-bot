@@ -43,6 +43,9 @@ export const updateClientQuote = (id, data) =>
 export const getClientQuoteAnalytics = () =>
   clientPortalApi.get('/client/quotes/analytics').then((r) => r.data.analytics);
 
+export const getClientCustomers = () =>
+  clientPortalApi.get('/client/customers').then((r) => r.data);
+
 export const getCustomerQuoteHistory = (identifier) =>
   clientPortalApi.get(`/client/customers/${encodeURIComponent(identifier)}/quotes`).then((r) => r.data);
 

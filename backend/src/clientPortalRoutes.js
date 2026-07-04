@@ -15,6 +15,7 @@ const quoteActions = require('./quoteActions');
 const mediaManager = require('./mediaManager');
 const emailNotifier = require('./emailNotifier');
 const settingsManager = require('./settingsManager');
+const { normalizeNumber } = require('./phone');
 
 const router = express.Router();
 
@@ -418,6 +419,7 @@ router.patch('/quotes/:id', async (req, res) => {
       if (quote.tier !== 2) {
         return res.status(400).json({ error: 'Only Tier 2 quotes can be revised' });
       }
+      // Allow revising quotes in any status — the revision will re-send the PDF
       if (!Array.isArray(line_items) || line_items.length === 0) {
         return res.status(400).json({ error: 'line_items are required for a revision' });
       }
@@ -471,6 +473,57 @@ router.get('/quotes/:id/pdf', (req, res) => {
 /** GET /client/quotes/analytics — monthly summary stats for this client's quotes. */
 router.get('/quotes/analytics', (req, res) => {
   res.json({ analytics: quoteManager.getQuoteAnalytics(req.clientId) });
+});
+
+/**
+/**
+ * GET /client/customers — all unique customers for this client, aggregated from
+ * quote history, with their current margin and summary stats.
+ */
+router.get('/customers', (req, res) => {
+  const quotes = quoteManager.getQuotesForClient(req.clientId, { limit: 10000 });
+  const margins = req.client.customer_margins || [];
+  const defaultMargin = Number(req.client.default_margin) || 0;
+
+  const byNumber = {};
+  for (const q of quotes) {
+    const num = q.customer_number || q.contact_number;
+    if (!num) continue;
+    if (!byNumber[num]) {
+      byNumber[num] = {
+        customer_number: num,
+        name: q.name || num,
+        quote_count: 0,
+        total_value: 0,
+        last_quote_at: q.created_at,
+        statuses: {},
+      };
+    }
+    const c = byNumber[num];
+    c.quote_count += 1;
+    c.total_value += Number(q.total) || 0;
+    if (!c.last_quote_at || q.created_at > c.last_quote_at) {
+      c.last_quote_at = q.created_at;
+      if (q.name) c.name = q.name;
+    }
+    c.statuses[q.status] = (c.statuses[q.status] || 0) + 1;
+  }
+
+  const customers = Object.values(byNumber).map((c) => {
+    const normalizedNum = normalizeNumber(c.customer_number);
+    const marginEntry = margins.find(
+      (m) => normalizeNumber(String(m.phone_number || '')) === normalizedNum
+    );
+    return {
+      ...c,
+      margin_percent: marginEntry ? Number(marginEntry.margin_percent) : defaultMargin,
+      margin_id: marginEntry ? marginEntry.id : null,
+      margin_is_custom: !!marginEntry,
+    };
+  });
+
+  customers.sort((a, b) => (b.last_quote_at || '').localeCompare(a.last_quote_at || ''));
+  res.json({ customers, default_margin: defaultMargin });
 });
 
 /**

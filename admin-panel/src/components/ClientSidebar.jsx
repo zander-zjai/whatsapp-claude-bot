@@ -8,6 +8,7 @@ const BASE_NAV_ITEMS = [
   { to: '/client/conversations', label: 'Conversations', icon: '💬' },
   { to: '/client/emails', label: 'Emails', icon: '📧' },
   { to: '/client/quotes', label: 'Quote Requests', icon: '📋' },
+  { to: '/client/customers', label: 'Customers', icon: '👥' },
 ];
 
 const PRICE_LIST_ITEM = { to: '/client/pricelist', label: 'Price List', icon: '💲' };
