@@ -18,7 +18,7 @@ const SETTINGS_ITEM = { to: '/client/settings', label: 'Settings', icon: '⚙️
 export default function ClientSidebar({ onNavigate }) {
   const { client, logout } = useClientAuth();
 
-  const navItems = [...BASE_NAV_ITEMS, PRICE_LIST_ITEM, MARGINS_ITEM, SETTINGS_ITEM];
+  const navItems = [...BASE_NAV_ITEMS, PRICE_LIST_ITEM, SETTINGS_ITEM];
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
