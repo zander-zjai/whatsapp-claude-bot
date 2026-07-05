@@ -534,7 +534,9 @@ router.get('/customers/:identifier/quotes', (req, res) => {
   const identifier = decodeURIComponent(req.params.identifier);
   const quotes = quoteManager.getQuotesForCustomer(req.clientId, identifier);
   const totalValue = quotes.reduce((s, q) => s + (Number(q.total) || 0), 0);
-  res.json({ quotes, total_value: totalValue, customer: identifier });
+  // Use the most recent name associated with this customer from their quotes
+  const customerName = quotes.length > 0 ? (quotes[quotes.length - 1].name || identifier) : identifier;
+  res.json({ quotes, total_value: totalValue, customer: identifier, customer_name: customerName });
 });
 
 // ------------------------------------------------------------------

@@ -124,8 +124,7 @@ export default function ClientPriceList() {
 
       {!loading && !error && quoteTier !== 2 && (
         <div className="rounded-xl border border-line bg-panel p-5 text-sm text-cream-dim shadow-sm">
-          The price list is only available for clients on the Auto PDF Quote (Tier 2) plan. Contact
-          ZJAI Technologies to upgrade.
+          Automatic PDF quotes are not enabled on your current plan. Contact ZJAI Technologies to enable this feature.
         </div>
       )}
 

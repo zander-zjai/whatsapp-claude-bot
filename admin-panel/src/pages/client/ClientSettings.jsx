@@ -167,7 +167,7 @@ export default function ClientSettings() {
           </section>
 
           <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-cream">Assistant</h2>
+            <h2 className="mb-4 text-base font-semibold text-cream">Zara — Your AI Assistant</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>Bot Personality</label>
@@ -200,7 +200,7 @@ export default function ClientSettings() {
                 className={inputClass}
               />
               <p className="mt-1 text-xs text-cream-dim">
-                Describes how the assistant should behave when chatting with your customers.
+                Tell Zara about your business and how to speak to your customers. E.g. "We are a vehicle wrapping company based in Cape Town. Always be friendly and professional. We specialise in full car wraps, fleet branding, and shopfront signage."
               </p>
             </div>
           </section>
@@ -228,13 +228,15 @@ export default function ClientSettings() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className={labelClass}>Timezone</label>
-                    <input
-                      type="text"
-                      value={businessHours.timezone}
-                      onChange={(e) => setHours('timezone', e.target.value)}
-                      placeholder="Africa/Johannesburg"
-                      className={inputClass}
-                    />
+                    <select value={businessHours.timezone} onChange={(e) => setHours('timezone', e.target.value)} className={inputClass}>
+                      <option value="Africa/Johannesburg">South Africa (SAST)</option>
+                      <option value="Africa/Lagos">Nigeria (WAT)</option>
+                      <option value="Africa/Nairobi">Kenya (EAT)</option>
+                      <option value="Europe/London">UK (GMT/BST)</option>
+                      <option value="America/New_York">US Eastern</option>
+                      <option value="America/Los_Angeles">US Pacific</option>
+                      <option value="Australia/Sydney">Australia (AEST)</option>
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>Opens</label>

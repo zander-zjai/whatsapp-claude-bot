@@ -384,7 +384,7 @@ export default function ClientDashboard() {
                   {pendingQuotes.map((q) => (
                     <li key={q.id}>
                       <Link
-                        to="/client/quotes"
+                        to={`/client/quotes/${q.id}`}
                         className="flex items-center justify-between rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm hover:border-primary"
                       >
                         <span className="text-cream">

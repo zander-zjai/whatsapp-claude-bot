@@ -12,6 +12,21 @@ import {
 import { getErrorMessage } from '../../api/client';
 import { formatDateTime } from '../../utils/format';
 
+const STATUS_LABELS = {
+  pending: 'Pending',
+  approved: 'Approved',
+  sent: 'Sent',
+  revised: 'Revised',
+  rejected: 'Declined',
+  declined: 'Declined',
+  accepted: 'Accepted',
+  quoted: 'Quoted',
+  won: 'Won',
+  lost: 'Lost',
+  needs_pricing: 'Needs Pricing',
+  expired: 'Expired',
+};
+
 const STATUS_STYLES = {
   pending: 'bg-yellow-100 text-yellow-700',
   approved: 'bg-blue-100 text-blue-700',
@@ -226,7 +241,7 @@ export default function ClientQuotes() {
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Name</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Item</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Total</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Margin</th>
+                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Discount</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-cream-dim">Actions</th>
               </tr>
@@ -267,11 +282,11 @@ export default function ClientQuotes() {
                       {quote.tier === 2 ? `R${Number(quote.total || 0).toFixed(2)}` : '—'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-cream-dim text-xs">
-                      {quote.margin_percent ? `+${quote.margin_percent}%` : '—'}
+                      {quote.margin_percent ? `${Math.abs(quote.margin_percent)}% off` : '—'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[quote.status] || 'bg-panel-2 text-cream-dim'}`}>
-                        {quote.status}
+                        {STATUS_LABELS[quote.status] || quote.status}
                       </span>
                       <Daysbadge validUntil={quote.valid_until} status={quote.status} />
                     </td>

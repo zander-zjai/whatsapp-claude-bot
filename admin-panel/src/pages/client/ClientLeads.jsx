@@ -34,14 +34,14 @@ export default function ClientLeads() {
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   return (
-    <ClientLayout title="Leads">
+    <ClientLayout title="Callback Requests">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-cream-dim">
-          {leads.length} caller{leads.length === 1 ? '' : 's'} asking for a callback
+          Callers who asked Zara for a callback — {leads.length} pending
         </p>
       </div>
 
-      {loading && <LoadingSpinner label="Loading leads…" />}
+      {loading && <LoadingSpinner label="Loading callbacks…" />}
       {!loading && error && <ErrorMessage message={error} />}
 
       {!loading && !error && leads.length === 0 && (
