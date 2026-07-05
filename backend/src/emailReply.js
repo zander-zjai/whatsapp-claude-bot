@@ -29,7 +29,7 @@ function buildEmailSystemPrompt(client, options = {}) {
       .map((p) => `- ${p.item} (${p.unit}): R${Number(p.price).toFixed(2)}`)
       .join('\n');
     parts.push(
-      `If the customer asks about pricing, use this price list to answer or estimate:\n${priceListText}\n\nMake clear any estimate is rough and the team will follow up with a final confirmed quote.`
+      `The following price list is for your reference only — use it to build quote line items internally, but do NOT quote any prices or estimates to the customer. If they ask about pricing, let them know a formal quote will be prepared and sent to them shortly by the team.\n${priceListText}`
     );
   }
 
