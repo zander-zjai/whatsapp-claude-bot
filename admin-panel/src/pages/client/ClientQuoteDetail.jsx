@@ -384,9 +384,9 @@ export default function ClientQuoteDetail() {
                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[quote.status] || 'bg-panel-2 text-cream-dim'}`}>
                   {quote.status}
                 </span>
-                {quote.margin_percent > 0 && (
-                  <span className="rounded-full bg-panel-2 px-2 py-0.5 text-xs font-medium text-cream-dim">
-                    {quote.margin_percent > 0 ? '+' : ''}{quote.margin_percent}% {quote.margin_percent < 0 ? 'discount' : 'margin'}
+                {!!quote.margin_percent && (
+                  <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
+                    {Math.abs(quote.margin_percent)}% discount
                   </span>
                 )}
                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${quote.payment_received ? 'bg-green-100 text-green-700' : 'bg-panel-2 text-cream-dim'}`}>
@@ -423,8 +423,8 @@ export default function ClientQuoteDetail() {
                 {quote.tier === 2 && (
                   <>
                     <div><dt className="text-xs font-medium text-cream-dim">Total</dt><dd className="text-sm text-cream">R{Number(quote.total || 0).toFixed(2)}</dd></div>
-                    {quote.margin_percent > 0 && (
-                      <div><dt className="text-xs font-medium text-cream-dim">Price adjustment</dt><dd className="text-sm text-cream">{quote.margin_percent > 0 ? '+' : ''}{quote.margin_percent}% {quote.margin_percent < 0 ? '(discount off list price)' : '(added to list price)'}</dd></div>
+                    {!!quote.margin_percent && (
+                      <div><dt className="text-xs font-medium text-cream-dim">Discount applied</dt><dd className="text-sm text-green-400">{Math.abs(quote.margin_percent)}% off list price</dd></div>
                     )}
                   </>
                 )}

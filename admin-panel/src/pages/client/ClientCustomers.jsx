@@ -11,27 +11,40 @@ import {
 } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
 
+// stored margin_percent is negative = discount (e.g. -10 = 10% off).
+// We show and accept positive discount % to keep it simple for Robin.
+function toDisplayDiscount(storedPct) {
+  // stored -10 → display 10, stored 0 → display 0
+  return Math.max(0, -(storedPct ?? 0));
+}
+function toStoredMargin(displayDiscount) {
+  // display 10 → store -10
+  return -(Math.abs(displayDiscount));
+}
+
 function MarginCell({ customer, defaultMargin, onSaved }) {
+  const displayDiscount = toDisplayDiscount(customer.margin_percent ?? defaultMargin);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(customer.margin_percent ?? defaultMargin));
+  const [draft, setDraft] = useState(String(displayDiscount));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   async function save() {
     const val = parseFloat(draft);
-    if (isNaN(val) || val < -100 || val > 100) { setError('-100 to 100'); return; }
+    if (isNaN(val) || val < 0 || val > 100) { setError('0–100'); return; }
     setSaving(true);
     setError('');
     try {
       if (customer.margin_is_custom) {
-        // delete old then re-add (upsert by phone number via addClientMargin)
         await deleteClientMargin(customer.margin_id);
       }
-      if (val !== defaultMargin || customer.margin_is_custom) {
+      // Only write a custom entry if it differs from the default
+      const defaultDiscount = toDisplayDiscount(defaultMargin);
+      if (val !== defaultDiscount || customer.margin_is_custom) {
         await addClientMargin({
           label: customer.name,
           phone_number: customer.customer_number,
-          margin_percent: val,
+          margin_percent: toStoredMargin(val),
         });
       }
       setEditing(false);
@@ -59,22 +72,12 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
 
   if (!editing) {
     return (
-      <button type="button" onClick={() => { setDraft(String(customer.margin_percent ?? defaultMargin)); setEditing(true); }}
+      <button type="button"
+        onClick={() => { setDraft(String(toDisplayDiscount(customer.margin_percent ?? defaultMargin))); setEditing(true); }}
         className="group flex items-center gap-1 text-left">
-        {(() => {
-          const pct = customer.margin_percent ?? defaultMargin;
-          const isDiscount = pct < 0;
-          const color = customer.margin_is_custom
-            ? (isDiscount ? 'text-green-400' : 'text-primary')
-            : 'text-cream-dim';
-          return (
-            <span className={`font-medium ${color}`}>
-              {pct > 0 ? '+' : ''}{pct}%
-              {isDiscount && <span className="ml-1 text-[10px] text-green-400">discount</span>}
-            </span>
-          );
-        })()}
-        {customer.margin_is_custom && !((customer.margin_percent ?? defaultMargin) < 0) && <span className="text-[10px] text-primary">markup</span>}
+        <span className={`font-medium ${customer.margin_is_custom ? 'text-green-400' : 'text-cream-dim'}`}>
+          {toDisplayDiscount(customer.margin_percent ?? defaultMargin)}% discount
+        </span>
         <span className="text-[10px] text-grey opacity-0 group-hover:opacity-100">edit</span>
       </button>
     );
@@ -83,7 +86,7 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
   return (
     <div className="flex items-center gap-1">
       <div className="relative">
-        <input type="number" min="-100" max="100" step="0.1" value={draft} autoFocus
+        <input type="number" min="0" max="100" step="0.1" value={draft} autoFocus
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
           className="w-20 rounded border border-line bg-panel px-2 py-0.5 pr-6 text-xs text-cream focus:border-primary focus:outline-none" />
@@ -96,7 +99,7 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
       {customer.margin_is_custom && (
         <button type="button" onClick={reset} disabled={saving}
           className="rounded border border-line px-1.5 py-0.5 text-[10px] text-cream-dim hover:text-red-400 disabled:opacity-60"
-          title="Reset to default">✕</button>
+          title="Reset to no discount">✕</button>
       )}
       {error && <span className="text-[10px] text-red-400">{error}</span>}
     </div>
@@ -117,7 +120,7 @@ export default function ClientCustomers() {
     try {
       const d = await getClientCustomers();
       setData(d);
-      setDefaultDraft(String(d.default_margin || 0));
+      setDefaultDraft(String(toDisplayDiscount(d.default_margin || 0)));
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load customers'));
     } finally {
@@ -132,7 +135,7 @@ export default function ClientCustomers() {
     if (isNaN(val) || val < 0 || val > 100) return;
     setSavingDefault(true);
     try {
-      await updateDefaultMargin(val);
+      await updateDefaultMargin(toStoredMargin(val));
       setDefaultSaved(true);
       setTimeout(() => setDefaultSaved(false), 2000);
       load();
@@ -169,10 +172,10 @@ export default function ClientCustomers() {
                 <div><p className="text-xs text-cream-dim">Total customers</p><p className="text-lg font-bold text-cream">{customers.length}</p></div>
                 <div><p className="text-xs text-cream-dim">Total quote value</p><p className="text-lg font-bold text-cream">R{totalValue.toFixed(2)}</p></div>
                 <div>
-                  <p className="text-xs text-cream-dim mb-1">Default margin (all customers)</p>
+                  <p className="text-xs text-cream-dim mb-1">Default discount (all customers)</p>
                   <div className="flex items-center gap-2">
                     <div className="relative">
-                      <input type="number" min="-100" max="100" step="0.1" value={defaultDraft}
+                      <input type="number" min="0" max="100" step="0.1" value={defaultDraft}
                         onChange={(e) => setDefaultDraft(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveDefault(); }}
                         className="w-20 rounded-lg border border-line bg-panel-2 px-2 py-1 pr-6 text-sm text-cream focus:border-primary focus:outline-none" />
@@ -206,7 +209,7 @@ export default function ClientCustomers() {
                   <tr className="border-b border-line">
                     <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Customer</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Number</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Price adj. <span className="font-normal text-grey">(− cheaper, + dearer)</span></th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Discount</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-cream-dim">Quotes</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-cream-dim">Total value</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-cream-dim">Won</th>
