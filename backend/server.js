@@ -54,6 +54,7 @@ bookingsManager.load();
 mediaManager.load();
 usageManager.load();
 emailLogsManager.load();
+require('./src/callbackDoneStore').load();
 emailPoller.startEmailPolling();
 
 // Drop error-log files older than 7 days, then once a day thereafter.

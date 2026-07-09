@@ -622,8 +622,9 @@ router.get('/emails', (req, res) => {
 // Call logs (proxied from JARVIS — AI Receptionist clients)
 // ------------------------------------------------------------------
 
-/** GET /client/calls — returns call log entries for this client from JARVIS. */
+/** GET /client/calls — returns call log entries for this client from JARVIS, merged with local callback-done state. */
 router.get('/calls', async (req, res) => {
+  const callbackDoneStore = require('./callbackDoneStore');
   const jarvisUrl = process.env.JARVIS_URL;
   const apiKey = process.env.CALLS_API_KEY;
 
@@ -638,11 +639,22 @@ router.get('/calls', async (req, res) => {
     );
     if (!upstream.ok) return res.json({ calls: [] });
     const data = await upstream.json();
-    res.json(data);
+    const calls = (data.calls || []).map((c) => ({
+      ...c,
+      callback_done: callbackDoneStore.isDone(`${req.clientId}:${c.id}`),
+    }));
+    res.json({ calls });
   } catch (err) {
     console.error('[calls-proxy] Failed to fetch from JARVIS:', err.message);
     res.json({ calls: [] });
   }
+});
+
+/** PATCH /client/calls/:id/callback-done — mark a callback as handled. */
+router.patch('/calls/:id/callback-done', (req, res) => {
+  const callbackDoneStore = require('./callbackDoneStore');
+  callbackDoneStore.markDone(`${req.clientId}:${req.params.id}`);
+  res.json({ ok: true });
 });
 
 // ------------------------------------------------------------------

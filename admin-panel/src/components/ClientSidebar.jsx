@@ -4,7 +4,6 @@ import { useClientAuth } from '../context/ClientAuthContext';
 const BASE_NAV_ITEMS = [
   { to: '/client/dashboard', label: 'Dashboard', icon: '🏠' },
   { to: '/client/calls', label: 'Call Logs', icon: '📞' },
-  { to: '/client/leads', label: 'Callbacks', icon: '🙋' },
   { to: '/client/conversations', label: 'Conversations', icon: '💬' },
   { to: '/client/emails', label: 'Emails', icon: '📧' },
   { to: '/client/quotes', label: 'Quote Requests', icon: '📋' },

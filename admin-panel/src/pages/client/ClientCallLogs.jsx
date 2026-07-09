@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
-import { getClientCallLogs } from '../../api/clientPortalEndpoints';
+import { getClientCallLogs, markCallbackDone } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
 
 function formatDateTime(iso) {
@@ -31,11 +31,35 @@ function LeadBadge({ tag, reason }) {
   );
 }
 
-function CallbackBadge({ requested }) {
-  if (!requested) return null;
+function CallbackCell({ call, onDone }) {
+  const [marking, setMarking] = useState(false);
+
+  if (!call.callback_requested) return null;
+  if (call.callback_done) {
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+        ✓ Callback Done
+      </span>
+    );
+  }
+
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-      📞 Callback Needed
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+        📞 Callback Needed
+      </span>
+      <button
+        type="button"
+        disabled={marking}
+        onClick={async (e) => {
+          e.stopPropagation();
+          setMarking(true);
+          try { await markCallbackDone(call.id); onDone(call.id); } finally { setMarking(false); }
+        }}
+        className="whitespace-nowrap rounded-full border border-line px-2 py-0.5 text-xs text-cream-dim hover:bg-panel-2 disabled:opacity-50"
+      >
+        {marking ? '…' : 'Mark done'}
+      </button>
     </span>
   );
 }
@@ -72,6 +96,10 @@ export default function ClientCallLogs() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  function handleCallbackDone(callId) {
+    setCalls((prev) => prev.map((c) => c.id === callId ? { ...c, callback_done: true } : c));
+  }
 
   return (
     <ClientLayout title="Call Logs">
@@ -125,7 +153,7 @@ export default function ClientCallLogs() {
                     <LeadBadge tag={call.lead_tag} reason={call.lead_reason} />
                   </td>
                   <td className="px-4 py-3">
-                    <CallbackBadge requested={call.callback_requested} />
+                    <CallbackCell call={call} onDone={handleCallbackDone} />
                   </td>
                   <td className="px-4 py-3 text-cream-dim">
                     {expanded === call.id ? (

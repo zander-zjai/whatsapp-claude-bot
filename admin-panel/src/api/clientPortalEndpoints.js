@@ -85,6 +85,9 @@ export const updateClientPriceList = (priceList) =>
 export const getClientCallLogs = () =>
   clientPortalApi.get('/client/calls').then((r) => r.data.calls || []);
 
+export const markCallbackDone = (callId) =>
+  clientPortalApi.patch(`/client/calls/${callId}/callback-done`).then((r) => r.data);
+
 // --- Email Receptionist ---
 export const getClientEmails = () =>
   clientPortalApi.get('/client/emails').then((r) => r.data.emails || []);
