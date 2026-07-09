@@ -440,7 +440,13 @@ router.patch('/quotes/:id', async (req, res) => {
       if (!Array.isArray(line_items) || line_items.length === 0) {
         return res.status(400).json({ error: 'line_items are required for a revision' });
       }
-      const { items, total } = quoteManager.recalculateRevisedItems(line_items);
+      // Apply the customer's stored discount to the entered unit prices, same as the auto-PDF path.
+      const marginMultiplier = 1 + (Number(quote.margin_percent) || 0) / 100;
+      const discountedLineItems = line_items.map((li) => ({
+        ...li,
+        unit_price: Math.round((Number(li.unit_price) || 0) * marginMultiplier * 100) / 100,
+      }));
+      const { items, total } = quoteManager.recalculateRevisedItems(discountedLineItems);
       const result = await quoteActions.reviseAndSendQuote(req.client, quote, { lineItems: items, total, notes, eta });
       if (!result.ok) {
         const message = result.reason === 'pdf_generation_failed'
