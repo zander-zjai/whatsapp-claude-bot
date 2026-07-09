@@ -11,7 +11,6 @@ const labelClass = 'mb-1 block text-sm font-medium text-cream-dim';
 
 export default function ClientPriceList() {
   const [priceList, setPriceList] = useState([]);
-  const [quoteTier, setQuoteTier] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -28,7 +27,6 @@ export default function ClientPriceList() {
         const data = await getClientPriceList();
         if (cancelled) return;
         setPriceList(data.price_list || []);
-        setQuoteTier(Number(data.quote_tier) || 1);
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err, 'Failed to load price list'));
       } finally {
@@ -122,13 +120,7 @@ export default function ClientPriceList() {
       {loading && <LoadingSpinner label="Loading price list…" />}
       {!loading && error && <ErrorMessage message={error} />}
 
-      {!loading && !error && quoteTier !== 2 && (
-        <div className="rounded-xl border border-line bg-panel p-5 text-sm text-cream-dim shadow-sm">
-          Automatic PDF quotes are not enabled on your current plan. Contact ZJAI Technologies to enable this feature.
-        </div>
-      )}
-
-      {!loading && !error && quoteTier === 2 && (
+      {!loading && !error && (
         <form onSubmit={handleSubmit} className="space-y-4">
           <ErrorMessage message={saveError} />
 

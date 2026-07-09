@@ -28,7 +28,6 @@ export const DEFAULT_CLIENT_VALUES = {
     days: [1, 2, 3, 4, 5],
   },
   quote_requests_enabled: false,
-  quote_tier: 1,
   price_list: [],
   logo_url: '',
   brand_color: '#1E3A8A',
@@ -106,7 +105,6 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
       ...values,
       monthly_message_limit: Number(values.monthly_message_limit) || 0,
       monthly_interaction_cap: Number(values.monthly_interaction_cap) || 0,
-      quote_tier: Number(values.quote_tier) === 2 ? 2 : 1,
       monthly_fee: Number(values.monthly_fee) || 0,
       price_list: values.price_list
         .map((entry) => ({
@@ -441,24 +439,11 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
 
         {values.quote_requests_enabled && (
           <div className="mt-4 space-y-4">
-            <div>
-              <label className={labelClass}>Quoting Tier</label>
-              <select
-                value={values.quote_tier}
-                onChange={(e) => set('quote_tier', Number(e.target.value))}
-                className={inputClass}
-              >
-                <option value={1}>Tier 1 — Quote Assist (notify owner, owner quotes manually)</option>
-                <option value={2}>Tier 2 — Auto PDF Quote (generate branded PDF for owner approval)</option>
-              </select>
-              <p className="mt-1 text-xs text-cream-dim">
-                {Number(values.quote_tier) === 2
-                  ? 'Zara calculates a total from the price list below and generates a branded PDF. The owner replies #approve or #reject before it\'s sent to the customer.'
-                  : 'Zara sends the owner a summary of the request; the owner prepares and sends the final quote manually.'}
-              </p>
-            </div>
+            <p className="text-xs text-cream-dim">
+              Zara collects the customer's details and notifies you via WhatsApp and email. If a price list is configured below, she'll also auto-generate a branded PDF quote for you to approve in the portal before it's sent to the customer.
+            </p>
 
-            {Number(values.quote_tier) === 2 && (
+            {(
               <>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -537,8 +522,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                   </button>
                   {values.price_list.length === 0 && (
                     <p className="mt-1 text-xs text-cream-dim">
-                      Tier 2 needs at least one price list item — without one, quotes fall back to
-                      Tier 1 behaviour.
+                      Add items to enable auto PDF quote generation. Without a price list, Zara will collect the details and notify you to quote manually.
                     </p>
                   )}
                 </div>

@@ -25,7 +25,6 @@ const EDITABLE_FIELDS = [
   'owner_phone',
   'business_hours',
   'quote_requests_enabled',
-  'quote_tier',
   'price_list',
   'logo_url',
   'brand_color',
@@ -92,7 +91,6 @@ const DEFAULTS = {
   active: true,
   owner_phone: '',
   quote_requests_enabled: false,
-  quote_tier: 1,
   price_list: [],
   logo_url: '',
   brand_color: '#1E3A8A',
@@ -309,7 +307,6 @@ function addClient(data) {
     use_platform_key: Boolean(picked.use_platform_key),
     active: picked.active !== undefined ? Boolean(picked.active) : DEFAULTS.active,
     quote_requests_enabled: Boolean(picked.quote_requests_enabled),
-    quote_tier: Number(picked.quote_tier) === 2 ? 2 : 1,
     price_list: sanitizePriceList(picked.price_list),
     team_members: sanitizeTeamMembers(picked.team_members),
     business_hours: { ...DEFAULT_BUSINESS_HOURS, ...(picked.business_hours || {}) },
@@ -354,9 +351,6 @@ function updateClient(id, data) {
   }
   if (picked.quote_requests_enabled !== undefined) {
     picked.quote_requests_enabled = Boolean(picked.quote_requests_enabled);
-  }
-  if (picked.quote_tier !== undefined) {
-    picked.quote_tier = Number(picked.quote_tier) === 2 ? 2 : 1;
   }
   if (picked.price_list !== undefined) {
     picked.price_list = sanitizePriceList(picked.price_list);

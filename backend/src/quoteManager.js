@@ -114,24 +114,15 @@ function clearForClient(clientId) {
   persist();
 }
 
-// ------------------------------------------------------------------
-// Tier 2: Auto PDF Quote
-//
-// When a client has quote_tier=2 and a non-empty price_list, a completed
-// quote-collection flow generates a branded PDF and a "pending" record
-// here instead of (just) notifying the owner with a summary. The owner
-// then replies #approve (PDF sent to the customer, status -> sent) or
-// #reject (status -> rejected, owner handles manually).
-// ------------------------------------------------------------------
-
 /**
- * True if a client has Tier 2 (Auto PDF Quote) configured with at least one
- * price list entry. Clients with quote_tier=2 but an empty price list fall
- * back to Tier 1 (Quote Assist) since totals can't be calculated.
+ * True if a client has Auto PDF Quote enabled — i.e. a non-empty price list
+ * is configured. When true, completed quote conversations auto-generate a
+ * branded PDF that the owner approves in the portal before it's sent.
+ * Without a price list, Zara collects the details and notifies the owner
+ * to quote manually.
  */
 function isPdfQuoteEnabled(client) {
   return (
-    Number(client && client.quote_tier) === 2 &&
     Array.isArray(client && client.price_list) &&
     client.price_list.length > 0
   );

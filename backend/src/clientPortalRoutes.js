@@ -651,15 +651,11 @@ router.get('/calls', async (req, res) => {
 
 /** GET /client/pricelist — current price list (empty for Tier 1 clients). */
 router.get('/pricelist', (req, res) => {
-  res.json({ price_list: req.client.price_list || [], quote_tier: req.client.quote_tier });
+  res.json({ price_list: req.client.price_list || [] });
 });
 
-/** PUT /client/pricelist — replace the price list. Tier 2 only. */
+/** PUT /client/pricelist — replace the price list. */
 router.put('/pricelist', (req, res) => {
-  if (Number(req.client.quote_tier) !== 2) {
-    return res.status(403).json({ error: 'Price list is only available for Tier 2 clients' });
-  }
-
   const { price_list: priceList } = req.body || {};
   const updated = clientManager.updatePriceList(req.clientId, priceList);
   log(`Client portal: ${req.client.name} updated their price list`);
