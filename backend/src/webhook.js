@@ -423,7 +423,7 @@ async function handleTier2Quote(client, from, quote, { items, total, marginPerce
     client_name: client.name,
     customer_number: from,
     name: quote.name,
-    contact_number: quote.contact_number,
+    contact_number: quote.contact_number || from,
     item_description: quote.item_description,
     size: quote.size,
     quantity: quote.quantity,
@@ -825,6 +825,7 @@ async function processMessage({
         client_name: client.name,
         customer_number: from,
         ...quote,
+        contact_number: quote.contact_number || from,
       });
       await notifyOwner(client, buildQuoteNotification(quote, from, score), {
         email: true,

@@ -470,15 +470,16 @@ function markExpiryOwnerNotified(id) {
 // its reply, which extractQuoteRequest() below strips out before the
 // message is sent to the customer.
 // ------------------------------------------------------------------
-const QUOTE_REQUEST_INSTRUCTIONS = `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, collect the following details through natural conversation — ask for whatever is still missing, one or two questions at a time, don't interrogate:
-- their name
-- a contact number
-- what they need (the product/service they're asking about)
+const QUOTE_REQUEST_INSTRUCTIONS = `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, gather the details you need through natural, sales-savvy conversation. Ask about the most important things first — what they need, specifications, and quantity — and leave pleasantries like their name until you have the essentials. Do NOT ask for a phone number; you already have their contact via this chat.
+
+Collect these details (in the order that makes sense for the conversation):
+- what they need (the product/service — be specific: type, material, use case)
 - the size or specifications
 - the quantity
+- their name (collect this last, once the key details are confirmed)
 
-Once you have ALL FIVE details, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
-[[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"..."}[[/QUOTE_REQUEST]]
+Once you have ALL FOUR details, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
+[[QUOTE_REQUEST]]{"name":"...","contact_number":"","item_description":"...","size":"...","quantity":"..."}[[/QUOTE_REQUEST]]
 
 Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
 
@@ -496,18 +497,19 @@ function buildQuoteInstructions(client) {
     .map((p) => `- ${p.item} (${p.unit}): R${Number(p.price).toFixed(2)}`)
     .join('\n');
 
-  return `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, collect the following details through natural conversation — ask for whatever is still missing, one or two questions at a time, don't interrogate:
-- their name
-- a contact number
-- what they need (the product/service they're asking about)
+  return `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, gather the details you need through natural, sales-savvy conversation. Lead with the most important questions first — what they need, size/specs, and quantity — and collect their name last once the essentials are confirmed. Do NOT ask for a phone number; you already have their contact via this chat.
+
+Collect these details (in the order that makes sense for the conversation):
+- what they need (the specific product/service — type, material, intended use)
 - the size or specifications
 - the quantity
+- their name (collect this last)
 
 You have access to this price list:
 ${priceListText}
 
-Once you have ALL FIVE details, use the price list internally to build the line items — but DO NOT state any price or estimate to the customer. Instead, confirm the details back to them and let them know a formal quote will be prepared and sent to them shortly, e.g. "Perfect — I've captured all the details. Our team will review and send you a formal quote as soon as possible." Give a warm, natural close. Do not mention prices, totals, or estimates at all. Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
-[[QUOTE_REQUEST]]{"name":"...","contact_number":"...","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
+Once you have ALL FOUR details, use the price list internally to build the line items — but DO NOT state any price or estimate to the customer. Instead, confirm the details back to them and let them know a formal quote will be prepared and sent to them shortly, e.g. "Perfect — I've captured all the details. Our team will review and send you a formal quote as soon as possible." Give a warm, natural close. Do not mention prices, totals, or estimates at all. Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
+[[QUOTE_REQUEST]]{"name":"...","contact_number":"","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
 
 If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
 }
