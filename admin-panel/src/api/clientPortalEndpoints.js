@@ -58,6 +58,9 @@ export const addClientMargin = (data) =>
 export const deleteClientMargin = (id) =>
   clientPortalApi.delete(`/client/margins/${id}`).then((r) => r.data.margins);
 
+export const updateClientMargin = (id, data) =>
+  clientPortalApi.patch(`/client/margins/${id}`, data).then((r) => r.data.margins);
+
 export const updateDefaultMargin = (marginPercent) =>
   clientPortalApi.patch('/client/margins/default', { margin_percent: marginPercent }).then((r) => r.data);
 

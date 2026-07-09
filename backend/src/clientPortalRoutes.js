@@ -247,14 +247,31 @@ router.get('/conversations', (req, res) => {
   res.json({ conversations });
 });
 
-/** GET /client/conversations/:customerNumber — conversation + full message history. */
+/** GET /client/conversations/:customerNumber — conversation + full message history.
+ *  If the identifier is an email address, returns the email thread instead. */
 router.get('/conversations/:customerNumber', (req, res) => {
   const customerNumber = decodeURIComponent(req.params.customerNumber);
+
+  // Email-channel: return email thread formatted as chat messages
+  if (customerNumber.includes('@')) {
+    const emailLogs = emailLogsManager.getLogsForAddress(req.clientId, customerNumber);
+    if (!emailLogs.length) return res.status(404).json({ error: 'Conversation not found' });
+    const messages = [];
+    for (const log of emailLogs) {
+      if (log.customer_message) {
+        messages.push({ id: log.id + '-in', role: 'user', content: log.customer_message, timestamp: log.timestamp, subject: log.subject });
+      }
+      if (log.reply_text) {
+        messages.push({ id: log.id + '-out', role: 'assistant', content: log.reply_text, timestamp: log.timestamp });
+      }
+    }
+    return res.json({ conversation: { customer_number: customerNumber, channel: 'email' }, messages });
+  }
+
   const conversation = conversationManager.findConversationByNumber(req.clientId, customerNumber);
   if (!conversation) {
     return res.status(404).json({ error: 'Conversation not found' });
   }
-
   const messages = logsManager.getLogsForConversation(req.clientId, conversation.customer_number);
   res.json({ conversation, messages });
 });
@@ -510,15 +527,18 @@ router.get('/customers', (req, res) => {
   }
 
   const customers = Object.values(byNumber).map((c) => {
-    const normalizedNum = normalizeNumber(c.customer_number);
-    const marginEntry = margins.find(
-      (m) => normalizeNumber(String(m.phone_number || '')) === normalizedNum
-    );
+    const num = c.customer_number;
+    const isEmail = num.includes('@');
+    const marginEntry = isEmail
+      ? margins.find((m) => m.email && String(m.email).toLowerCase() === num.toLowerCase())
+      : margins.find((m) => m.phone_number && normalizeNumber(String(m.phone_number)) === normalizeNumber(num));
     return {
       ...c,
       margin_percent: marginEntry ? Number(marginEntry.margin_percent) : defaultMargin,
       margin_id: marginEntry ? marginEntry.id : null,
       margin_is_custom: !!marginEntry,
+      linked_email: marginEntry ? (marginEntry.email || '') : '',
+      linked_phone: marginEntry ? (marginEntry.phone_number || '') : '',
     };
   });
 
@@ -553,14 +573,22 @@ router.get('/margins', (req, res) => {
 
 /** POST /client/margins — add or update a customer margin. */
 router.post('/margins', (req, res) => {
-  const { label, phone_number, margin_percent } = req.body || {};
-  if (!phone_number) {
-    return res.status(400).json({ error: 'phone_number is required' });
+  const { label, phone_number, email, margin_percent } = req.body || {};
+  if (!phone_number && !email) {
+    return res.status(400).json({ error: 'phone_number or email is required' });
   }
   if (margin_percent === undefined || margin_percent === null) {
     return res.status(400).json({ error: 'margin_percent is required' });
   }
-  const margins = clientManager.addCustomerMargin(req.clientId, { label, phone_number, margin_percent });
+  const margins = clientManager.addCustomerMargin(req.clientId, { label, phone_number, email, margin_percent });
+  res.json({ margins });
+});
+
+/** PATCH /client/margins/:id — update label, phone_number, email, or margin_percent on a record. */
+router.patch('/margins/:id', (req, res) => {
+  const { label, phone_number, email, margin_percent } = req.body || {};
+  const margins = clientManager.updateCustomerMargin(req.clientId, req.params.id, { label, phone_number, email, margin_percent });
+  if (!margins) return res.status(404).json({ error: 'Margin not found' });
   res.json({ margins });
 });
 

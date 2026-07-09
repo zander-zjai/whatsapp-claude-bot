@@ -479,57 +479,87 @@ function setClientPasswordHash(id, hash) {
 
 // ------------------------------------------------------------------
 // Customer margin helpers — stored as client.customer_margins, an array of
-// { id, label, phone_number, margin_percent, created_at } records. The phone_number
-// field is matched (normalized) against the incoming customer number at
-// quote-generation time; label is a display name for the portal.
+// { id, label, phone_number, email, margin_percent, created_at } records.
+// Matching is by phone_number (normalised) for WhatsApp/voice, or by email
+// (case-insensitive) for email-channel quotes. Either field is optional but
+// at least one must be set.
 // ------------------------------------------------------------------
 
 const { normalizeNumber: _normalize } = require('./phone');
 
+function _isEmail(s) { return String(s || '').includes('@'); }
+
 /**
- * Resolve the margin percentage to apply for a given customer number.
- * Returns the per-customer margin if one is configured, otherwise the
- * client's default_margin, otherwise 0.
+ * Resolve the margin percentage to apply for a given customer identifier
+ * (phone number or email address).
  *
  * @returns {{ marginPercent: number, marginId: string|null }}
  */
-function resolveMarginForCustomer(client, customerNumber) {
+function resolveMarginForCustomer(client, customerIdentifier) {
   const margins = Array.isArray(client.customer_margins) ? client.customer_margins : [];
-  const normalized = _normalize(String(customerNumber || ''));
-  const match = margins.find(
-    (m) => m.phone_number && _normalize(String(m.phone_number)) === normalized
-  );
+  const id = String(customerIdentifier || '');
+  let match;
+  if (_isEmail(id)) {
+    const lower = id.toLowerCase();
+    match = margins.find((m) => m.email && String(m.email).toLowerCase() === lower);
+  } else {
+    const normalized = _normalize(id);
+    match = margins.find((m) => m.phone_number && _normalize(String(m.phone_number)) === normalized);
+  }
   if (match) return { marginPercent: Number(match.margin_percent) || 0, marginId: match.id };
   return { marginPercent: Number(client.default_margin) || 0, marginId: null };
 }
 
-/** Add or update a customer margin record. If a record with matching phone_number exists,
- *  it is replaced; otherwise a new one is appended. */
-function addCustomerMargin(clientId, { label, phone_number, margin_percent }) {
+/** Add or update a customer margin record. Matches existing records by phone_number
+ *  or email. At least one of phone_number / email must be supplied. */
+function addCustomerMargin(clientId, { label, phone_number, email, margin_percent }) {
   const client = getClientById(clientId);
   if (!client) return undefined;
 
   if (!Array.isArray(client.customer_margins)) client.customer_margins = [];
 
-  const normalized = _normalize(String(phone_number || ''));
-  const existing = client.customer_margins.find(
-    (m) => _normalize(String(m.phone_number || '')) === normalized
-  );
+  const normalizedPhone = phone_number ? _normalize(String(phone_number)) : null;
+  const normalizedEmail = email ? String(email).toLowerCase() : null;
+
+  const existing = client.customer_margins.find((m) => {
+    if (normalizedPhone && m.phone_number && _normalize(String(m.phone_number)) === normalizedPhone) return true;
+    if (normalizedEmail && m.email && String(m.email).toLowerCase() === normalizedEmail) return true;
+    return false;
+  });
 
   if (existing) {
-    existing.label = label || existing.label;
+    if (label !== undefined) existing.label = label || existing.label;
     existing.margin_percent = Number(margin_percent) || 0;
+    if (phone_number !== undefined) existing.phone_number = phone_number || existing.phone_number || '';
+    if (email !== undefined) existing.email = email || existing.email || '';
     existing.updated_at = new Date().toISOString();
   } else {
     client.customer_margins.push({
       id: require('crypto').randomUUID(),
       label: label || '',
       phone_number: phone_number || '',
+      email: email || '',
       margin_percent: Number(margin_percent) || 0,
       created_at: new Date().toISOString(),
     });
   }
 
+  client.updated_at = new Date().toISOString();
+  persist();
+  return client.customer_margins;
+}
+
+/** Update specific fields on an existing margin record by id. */
+function updateCustomerMargin(clientId, marginId, fields) {
+  const client = getClientById(clientId);
+  if (!client || !Array.isArray(client.customer_margins)) return undefined;
+  const record = client.customer_margins.find((m) => m.id === marginId);
+  if (!record) return undefined;
+  const allowed = ['label', 'phone_number', 'email', 'margin_percent'];
+  for (const key of allowed) {
+    if (fields[key] !== undefined) record[key] = key === 'margin_percent' ? Number(fields[key]) || 0 : fields[key];
+  }
+  record.updated_at = new Date().toISOString();
   client.updated_at = new Date().toISOString();
   persist();
   return client.customer_margins;
@@ -616,5 +646,6 @@ module.exports = {
   getClientByResetToken,
   resolveMarginForCustomer,
   addCustomerMargin,
+  updateCustomerMargin,
   removeCustomerMargin,
 };

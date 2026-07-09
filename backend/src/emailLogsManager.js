@@ -48,9 +48,18 @@ function getLogsForClient(clientId, { limit = 100 } = {}) {
     .slice(0, limit);
 }
 
+/** Email exchanges between this client and a specific sender address. */
+function getLogsForAddress(clientId, fromAddress) {
+  const lower = String(fromAddress || '').toLowerCase();
+  return logs
+    .filter((l) => l.client_id === clientId && String(l.from_address || '').toLowerCase() === lower)
+    .slice()
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
 function getTodayCountForClient(clientId) {
   const todayStr = new Date().toISOString().slice(0, 10);
   return logs.filter((l) => l.client_id === clientId && l.timestamp.slice(0, 10) === todayStr).length;
 }
 
-module.exports = { load, addLog, getLogsForClient, getTodayCountForClient };
+module.exports = { load, addLog, getLogsForClient, getLogsForAddress, getTodayCountForClient };

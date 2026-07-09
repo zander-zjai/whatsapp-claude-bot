@@ -7,21 +7,15 @@ import {
   getClientCustomers,
   addClientMargin,
   deleteClientMargin,
+  updateClientMargin,
   updateDefaultMargin,
 } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
 
-// stored margin_percent is negative = discount (e.g. -10 = 10% off).
-// We show and accept positive discount % to keep it simple for Robin.
-function toDisplayDiscount(storedPct) {
-  // stored -10 → display 10, stored 0 → display 0
-  return Math.max(0, -(storedPct ?? 0));
-}
-function toStoredMargin(displayDiscount) {
-  // display 10 → store -10
-  return -(Math.abs(displayDiscount));
-}
+function toDisplayDiscount(storedPct) { return Math.max(0, -(storedPct ?? 0)); }
+function toStoredMargin(displayDiscount) { return -(Math.abs(displayDiscount)); }
 
+// ── Discount cell ─────────────────────────────────────────────────────────────
 function MarginCell({ customer, defaultMargin, onSaved }) {
   const displayDiscount = toDisplayDiscount(customer.margin_percent ?? defaultMargin);
   const [editing, setEditing] = useState(false);
@@ -35,17 +29,20 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      if (customer.margin_is_custom) {
-        await deleteClientMargin(customer.margin_id);
-      }
-      // Only write a custom entry if it differs from the default
-      const defaultDiscount = toDisplayDiscount(defaultMargin);
-      if (val !== defaultDiscount || customer.margin_is_custom) {
-        await addClientMargin({
-          label: customer.name,
-          phone_number: customer.customer_number,
-          margin_percent: toStoredMargin(val),
-        });
+      if (customer.margin_is_custom && customer.margin_id) {
+        // Update in place — preserves linked email
+        await updateClientMargin(customer.margin_id, { margin_percent: toStoredMargin(val) });
+      } else {
+        const defaultDiscount = toDisplayDiscount(defaultMargin);
+        if (val !== defaultDiscount) {
+          const isEmail = customer.customer_number.includes('@');
+          await addClientMargin({
+            label: customer.name,
+            phone_number: isEmail ? '' : customer.customer_number,
+            email: isEmail ? customer.customer_number : (customer.linked_email || ''),
+            margin_percent: toStoredMargin(val),
+          });
+        }
       }
       setEditing(false);
       onSaved();
@@ -57,7 +54,7 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
   }
 
   async function reset() {
-    if (!customer.margin_is_custom) { setEditing(false); return; }
+    if (!customer.margin_is_custom || !customer.margin_id) { setEditing(false); return; }
     setSaving(true);
     try {
       await deleteClientMargin(customer.margin_id);
@@ -76,7 +73,7 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
         onClick={() => { setDraft(String(toDisplayDiscount(customer.margin_percent ?? defaultMargin))); setEditing(true); }}
         className="group flex items-center gap-1 text-left">
         <span className={`font-medium ${customer.margin_is_custom ? 'text-green-400' : 'text-cream-dim'}`}>
-          {toDisplayDiscount(customer.margin_percent ?? defaultMargin)}% discount
+          {toDisplayDiscount(customer.margin_percent ?? defaultMargin)}% off
         </span>
         <span className="text-[10px] text-grey opacity-0 group-hover:opacity-100">edit</span>
       </button>
@@ -99,13 +96,78 @@ function MarginCell({ customer, defaultMargin, onSaved }) {
       {customer.margin_is_custom && (
         <button type="button" onClick={reset} disabled={saving}
           className="rounded border border-line px-1.5 py-0.5 text-[10px] text-cream-dim hover:text-red-400 disabled:opacity-60"
-          title="Reset to no discount">✕</button>
+          title="Reset to default">✕</button>
       )}
       {error && <span className="text-[10px] text-red-400">{error}</span>}
     </div>
   );
 }
 
+// ── Email link cell ───────────────────────────────────────────────────────────
+function EmailCell({ customer, defaultMargin, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(customer.linked_email || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    setSaving(true);
+    setError('');
+    try {
+      if (customer.margin_id) {
+        await updateClientMargin(customer.margin_id, { email: draft.trim() });
+      } else {
+        // Create a new margin entry at the default rate, just to store the email link
+        const isEmail = customer.customer_number.includes('@');
+        await addClientMargin({
+          label: customer.name,
+          phone_number: isEmail ? '' : customer.customer_number,
+          email: draft.trim(),
+          margin_percent: customer.margin_percent ?? defaultMargin,
+        });
+      }
+      setEditing(false);
+      onSaved();
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const display = customer.linked_email;
+
+  if (!editing) {
+    return (
+      <button type="button"
+        onClick={() => { setDraft(customer.linked_email || ''); setEditing(true); }}
+        className="group flex items-center gap-1 text-left min-w-0">
+        {display
+          ? <span className="truncate font-mono text-xs text-cream-dim">{display}</span>
+          : <span className="text-xs text-grey opacity-60 group-hover:opacity-100">+ link email</span>
+        }
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input type="email" value={draft} autoFocus placeholder="customer@email.com"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        className="w-40 rounded border border-line bg-panel px-2 py-0.5 text-xs text-cream placeholder:text-grey focus:border-primary focus:outline-none" />
+      <button type="button" onClick={save} disabled={saving}
+        className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-ink disabled:opacity-60">
+        {saving ? '…' : '✓'}
+      </button>
+      <button type="button" onClick={() => setEditing(false)}
+        className="rounded border border-line px-1.5 py-0.5 text-[10px] text-cream-dim hover:text-red-400">✕</button>
+      {error && <span className="text-[10px] text-red-400">{error}</span>}
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ClientCustomers() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -139,19 +201,15 @@ export default function ClientCustomers() {
       setDefaultSaved(true);
       setTimeout(() => setDefaultSaved(false), 2000);
       load();
-    } catch {
-      // ignore
-    } finally {
-      setSavingDefault(false);
-    }
+    } catch { /* ignore */ } finally { setSavingDefault(false); }
   }
 
   const customers = data?.customers || [];
   const filtered = search
-    ? customers.filter(
-        (c) =>
-          c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.customer_number.includes(search)
+    ? customers.filter((c) =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.customer_number.toLowerCase().includes(search.toLowerCase()) ||
+        (c.linked_email || '').toLowerCase().includes(search.toLowerCase())
       )
     : customers;
 
@@ -165,7 +223,6 @@ export default function ClientCustomers() {
 
       {!loading && !error && data && (
         <>
-          {/* Summary + default margin */}
           <div className="mb-4 flex flex-wrap items-start gap-4">
             <div className="flex-1 rounded-xl border border-line bg-panel p-4 shadow-sm">
               <div className="flex flex-wrap gap-6">
@@ -192,23 +249,26 @@ export default function ClientCustomers() {
             </div>
           </div>
 
-          {/* Search */}
+          <p className="mb-3 text-xs text-cream-dim">
+            Link a customer's email address to their phone number so discounts apply whether they contact you via WhatsApp or email.
+          </p>
+
           <div className="mb-3">
-            <input type="text" placeholder="Search by name or number…" value={search}
+            <input type="text" placeholder="Search by name, number, or email…" value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full max-w-sm rounded-lg border border-line bg-panel px-3 py-2 text-sm text-cream placeholder:text-grey focus:border-primary focus:outline-none" />
           </div>
 
-          {/* Table */}
           {filtered.length === 0 ? (
-            <p className="py-10 text-center text-cream-dim">{search ? 'No customers match your search.' : 'No customers yet.'}</p>
+            <p className="py-10 text-center text-cream-dim">{search ? 'No customers match.' : 'No customers yet.'}</p>
           ) : (
             <div className="rounded-xl border border-line bg-panel shadow-sm overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line">
                     <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Number</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Number / Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Linked email</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-cream-dim">Discount</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-cream-dim">Quotes</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-cream-dim">Total value</th>
@@ -221,10 +281,22 @@ export default function ClientCustomers() {
                     const wonCount = Object.entries(c.statuses || {})
                       .filter(([s]) => ['won', 'accepted'].includes(s))
                       .reduce((n, [, v]) => n + v, 0);
+                    const isEmailCustomer = c.customer_number.includes('@');
                     return (
                       <tr key={c.customer_number} className="hover:bg-panel-2 transition-colors">
                         <td className="px-4 py-3 font-medium text-cream">{c.name}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-cream-dim">{c.customer_number}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-cream-dim">
+                          <span className="flex items-center gap-1">
+                            {isEmailCustomer ? '📧' : '📱'} {c.customer_number}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {/* Only show email link cell for phone-based customers */}
+                          {!isEmailCustomer
+                            ? <EmailCell customer={c} defaultMargin={defaultMargin} onSaved={load} />
+                            : <span className="text-xs text-grey">—</span>
+                          }
+                        </td>
                         <td className="px-4 py-3">
                           <MarginCell customer={c} defaultMargin={defaultMargin} onSaved={load} />
                         </td>
