@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const crypto = require('crypto');
 const { log, logError } = require('./logger');
@@ -6,7 +6,7 @@ const errorLogger = require('./errorLogger');
 const clientManager = require('./clientManager');
 const memory = require('./memory');
 const { getClaudeReply } = require('./claude');
-const { sendWhatsAppMessage } = require('./whatsapp');
+const { sendWhatsAppMessage, sendWhatsAppImage } = require('./whatsapp');
 const settingsManager = require('./settingsManager');
 const logsManager = require('./logsManager');
 const { maskPhone, normalizeNumber } = require('./phone');
@@ -22,6 +22,10 @@ const pdfGenerator = require('./pdfGenerator');
 const businessHours = require('./businessHours');
 const handover = require('./handover');
 const emailNotifier = require('./emailNotifier');
+const mockupManager = require('./mockupManager');
+const fs = require('fs');
+const path = require('path');
+const { dataPath } = require('./fileStore');
 
 const URGENT_REPLY = 'Let me connect you with someone.';
 
@@ -104,7 +108,7 @@ function parseIncomingMessage(body) {
     log(`[diagnostic] webhook metadata: ${JSON.stringify(value.metadata)}`);
 
     // Images/documents (e.g. design files) are captured as attachments
-    // rather than passed to Claude — see processMessage's media branch.
+    // rather than passed to Claude â€” see processMessage's media branch.
     if (message.type === 'image' || message.type === 'document') {
       const media = message[message.type];
       return {
@@ -156,7 +160,7 @@ function handleWebhook(req, res) {
 
   if (parsed.ignored) {
     log(
-      `Unhandled message type ("${parsed.type}") from ${parsed.from} — sending generic fallback reply`
+      `Unhandled message type ("${parsed.type}") from ${parsed.from} â€” sending generic fallback reply`
     );
     processUnhandledMessage(parsed).catch((err) => {
       logError('Unhandled error while processing unrecognized message type:', err);
@@ -177,8 +181,8 @@ function handleWebhook(req, res) {
   });
 }
 
-const NO_CAPTION_REPLY = "Got it, thanks! I've got your image/file — someone from our team will take a look. Let me know if there's anything else I can help with in the meantime.";
-const UNHANDLED_TYPE_REPLY = "I've got your message — I can't quite open that type of file here, but let me know in writing what you need and I'll help, or someone from our team will follow up.";
+const NO_CAPTION_REPLY = "Got it, thanks! I've got your image/file â€” someone from our team will take a look. Let me know if there's anything else I can help with in the meantime.";
+const UNHANDLED_TYPE_REPLY = "I've got your message â€” I can't quite open that type of file here, but let me know in writing what you need and I'll help, or someone from our team will follow up.";
 
 // Claude vision supports these image types directly; documents (PDFs etc.)
 // stay on the caption-only fallback path since they aren't image input.
@@ -186,7 +190,7 @@ const VISION_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 /**
  * Safety net for any message type we don't have specific handling for
- * (audio notes, stickers, location pins, contacts, etc.) — Zara must never
+ * (audio notes, stickers, location pins, contacts, etc.) â€” Zara must never
  * go silent on an inbound message, regardless of type.
  */
 async function processUnhandledMessage({ from, phoneNumberId, type }) {
@@ -214,7 +218,7 @@ async function processUnhandledMessage({ from, phoneNumberId, type }) {
  * quote's Attachments tab. Zara must never go silent on this:
  *  - Images (jpeg/png/webp) go through real Claude vision, so she can
  *    actually see and reason about logos/designs/reference photos.
- *  - Documents (PDFs etc.) aren't vision input — a caption routes through
+ *  - Documents (PDFs etc.) aren't vision input â€” a caption routes through
  *    the normal Claude pipeline with a note that she can't see the file
  *    itself; no caption gets a generic acknowledgment reply.
  */
@@ -243,7 +247,7 @@ async function processInboundMedia({ from, phoneNumberId, mediaId, mimeType, cap
     await processMessage({
       from,
       phoneNumberId,
-      text: trimmedCaption || "Here's an image — take a look and let me know what you think.",
+      text: trimmedCaption || "Here's an image â€” take a look and let me know what you think.",
       imageBase64: captured.base64,
       imageMimeType: captured.mime_type,
       attachmentId: captured.id,
@@ -291,10 +295,10 @@ async function notifyOwner(client, text, { email = false, emailSubject } = {}) {
     }
   }
 
-  // Email leg is independent of the WhatsApp send above — if Robin's 24h
+  // Email leg is independent of the WhatsApp send above â€” if Robin's 24h
   // WhatsApp window is closed, the email should still go through.
   if (email) {
-    await emailNotifier.sendOwnerEmail(client, emailSubject || `${client.name} — ZJAI notification`, text);
+    await emailNotifier.sendOwnerEmail(client, emailSubject || `${client.name} â€” ZJAI notification`, text);
   }
 }
 
@@ -382,7 +386,7 @@ function quotesPortalLink() {
 /** Owner notification (WhatsApp + email) sent when Zara collects a full quote request. */
 function buildQuoteNotification(quote, from, score) {
   return (
-    `New quote request — ${score.temperature.toUpperCase()} — ${quote.name}, ${quote.contact_number}, ` +
+    `New quote request â€” ${score.temperature.toUpperCase()} â€” ${quote.name}, ${quote.contact_number}, ` +
     `${quote.item_description} (size: ${quote.size}, qty: ${quote.quantity}). (WhatsApp: ${from})\n` +
     `Approve in portal: ${quotesPortalLink()}`
   );
@@ -392,13 +396,13 @@ function buildQuoteNotification(quote, from, score) {
 function buildPdfQuoteNotification(record, score) {
   if (record.status === 'needs_pricing') {
     return (
-      `New quote request — ${score.temperature.toUpperCase()} — ${record.name}, ${record.contact_number}, ` +
-      `${record.item_description || 'their request'} — didn't match anything on your price list, no PDF generated. ` +
+      `New quote request â€” ${score.temperature.toUpperCase()} â€” ${record.name}, ${record.contact_number}, ` +
+      `${record.item_description || 'their request'} â€” didn't match anything on your price list, no PDF generated. ` +
       `Please price it manually and follow up directly. View in portal: ${quotesPortalLink()}`
     );
   }
   return (
-    `New quote request — ${score.temperature.toUpperCase()} — ${record.name}, ${record.contact_number}, ` +
+    `New quote request â€” ${score.temperature.toUpperCase()} â€” ${record.name}, ${record.contact_number}, ` +
     `${record.item_description}, ${pdfGenerator.formatCurrency(record.total)}. ` +
     `Approve in portal: ${quotesPortalLink()}`
   );
@@ -410,7 +414,7 @@ function buildPdfQuoteNotification(record, score) {
  * approval. The PDF is NOT sent to the customer yet.
  *
  * If nothing on the price list matched (total is 0), the quote is marked
- * "needs_pricing" instead of "pending" — this isn't an approvable state
+ * "needs_pricing" instead of "pending" â€” this isn't an approvable state
  * (the portal's Approve/Reject only render for status "pending"), so a
  * zero-rand quote can never be one-click approved and sent to a customer.
  * No PDF is generated for it either, since there's nothing real to show.
@@ -446,7 +450,7 @@ async function handleTier2Quote(client, from, quote, { items, total, marginPerce
 
   await notifyOwner(client, buildPdfQuoteNotification(record, score), {
     email: true,
-    emailSubject: `New quote request — ${score.temperature.toUpperCase()}`,
+    emailSubject: `New quote request â€” ${score.temperature.toUpperCase()}`,
   });
 }
 
@@ -470,7 +474,7 @@ function buildBookingWindow(date, time, durationMinutes) {
 /**
  * Handle a [[BOOKING_REQUEST]] extracted from Claude's reply: check the
  * client's Google Calendar for availability, create the event if free, and
- * notify the customer + owner. Never throws — all failures are logged and
+ * notify the customer + owner. Never throws â€” all failures are logged and
  * degrade to a customer-facing fallback message.
  */
 async function handleBookingRequest(client, from, booking) {
@@ -499,14 +503,14 @@ async function handleBookingRequest(client, from, booking) {
       await sendReply(
         client,
         from,
-        `That time's actually taken — could you give me another day or time that works for you?`
+        `That time's actually taken â€” could you give me another day or time that works for you?`
       );
       return;
     }
 
     const event = await googleCalendarClient.createEvent({
       ...calendarCreds,
-      summary: `${client.name} — ${booking.name} (unassigned)`,
+      summary: `${client.name} â€” ${booking.name} (unassigned)`,
       description: `Contact: ${booking.contact_number}${booking.notes ? `\nNotes: ${booking.notes}` : ''}`,
       startISO: window.startISO,
       endISO: window.endISO,
@@ -536,8 +540,8 @@ async function handleBookingRequest(client, from, booking) {
 
     await notifyOwner(
       client,
-      `New booking — ${booking.name}, ${booking.contact_number}, ${booking.date} ${booking.time}. Unassigned on the calendar.${teamHint}`,
-      { email: true, emailSubject: `New booking — ${booking.name}` }
+      `New booking â€” ${booking.name}, ${booking.contact_number}, ${booking.date} ${booking.time}. Unassigned on the calendar.${teamHint}`,
+      { email: true, emailSubject: `New booking â€” ${booking.name}` }
     );
   } catch (err) {
     const detail = err.response ? JSON.stringify(err.response.data) : err.message;
@@ -547,11 +551,11 @@ async function handleBookingRequest(client, from, booking) {
     await sendReply(
       client,
       from,
-      `Sorry, I couldn't get that booked just now — ${client.name} will confirm with you directly shortly.`
+      `Sorry, I couldn't get that booked just now â€” ${client.name} will confirm with you directly shortly.`
     );
     await notifyOwner(
       client,
-      `Booking attempt failed for ${booking.name} (${booking.contact_number}), requested ${booking.date} ${booking.time} — calendar error, please follow up manually: ${detail}`
+      `Booking attempt failed for ${booking.name} (${booking.contact_number}), requested ${booking.date} ${booking.time} â€” calendar error, please follow up manually: ${detail}`
     );
   }
 }
@@ -634,8 +638,108 @@ async function handleBookingAssignment(client, bookingId, teamMemberName) {
     const detail = err.response ? JSON.stringify(err.response.data) : err.message;
     logError(`[${client.name}] Failed to assign booking ${bookingId}:`, detail);
     errorLogger.logErrorToFile(`[${client.name}] Failed to assign booking ${bookingId}`, err);
-    await notifyOwner(client, `Couldn't update the calendar for that assignment — please update it manually in Google Calendar.`);
+    await notifyOwner(client, `Couldn't update the calendar for that assignment â€” please update it manually in Google Calendar.`);
   }
+}
+
+
+const MOCKUP_KEYWORDS = ['mockup', 'design preview', 'visualise', 'visualize', 'show me what', 'how would it look'];
+
+/**
+ * Check whether an inbound message is requesting a mockup/design preview.
+ */
+function isMockupRequest(text) {
+  const lower = String(text || '').toLowerCase();
+  return MOCKUP_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+/**
+ * Handle a mockup request: get Claude to write a visual description, call
+ * Stability AI to generate an image, store the result, and acknowledge the
+ * customer. Returns early so the normal Claude reply is skipped.
+ */
+async function handleMockupRequest(client, from, messageText, imageBase64, imageMimeType) {
+  const { getAnthropicClient, resolveApiKey, MODEL } = require('./claude');
+
+  // Step 1: Ask Claude for a detailed visual description for image generation.
+  let visualDescription = '';
+  try {
+    const anthropic = getAnthropicClient(resolveApiKey(client));
+    const userContent = imageBase64
+      ? [
+          { type: 'image', source: { type: 'base64', media_type: imageMimeType, data: imageBase64 } },
+          { type: 'text', text: messageText },
+        ]
+      : messageText;
+
+    const descResp = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 512,
+      system: 'You are a signage design expert. The customer wants a visual mockup of their sign. Write a detailed, specific image generation prompt (2-4 sentences) for a photorealistic image of the sign they described. Focus on: sign type, size, materials, colours, text/graphics placement, environment/mounting context. Do not include any commentary â€” output only the prompt text.',
+      messages: [{ role: 'user', content: userContent }],
+    });
+    visualDescription = descResp.content[0].text.trim();
+  } catch (err) {
+    logError(`[${client.name}] Mockup: Failed to get visual description from Claude:`, err.message);
+    visualDescription = messageText; // fall back to raw message
+  }
+
+  // Step 2: Call Stability AI to generate the image.
+  const stabilityKey = process.env.STABILITY_API_KEY;
+  let imagePath = null;
+
+  if (stabilityKey && visualDescription) {
+    try {
+      const axios = require('axios');
+      const FormData = require('form-data');
+      const form = new FormData();
+      form.append('prompt', `Photorealistic signage mockup: ${visualDescription}`);
+      form.append('output_format', 'png');
+      form.append('aspect_ratio', '16:9');
+
+      const resp = await axios.post(
+        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${stabilityKey}`,
+            Accept: 'image/*',
+            ...form.getHeaders(),
+          },
+          responseType: 'arraybuffer',
+          timeout: 60000,
+        }
+      );
+
+      const mockupId = require('crypto').randomUUID();
+      const dir = dataPath(path.join('mockups', client.id));
+      fs.mkdirSync(dir, { recursive: true });
+      imagePath = path.join(dir, `${mockupId}.png`);
+      fs.writeFileSync(imagePath, Buffer.from(resp.data));
+    } catch (err) {
+      logError(`[${client.name}] Mockup: Stability AI generation failed:`, err.message);
+    }
+  }
+
+  // Step 3: Get customer name from conversation
+  const conv = conversationManager.getConversation(client.id, from);
+
+  // Step 4: Store mockup record
+  mockupManager.addMockup({
+    client_id: client.id,
+    customer_number: from,
+    customer_name: conv ? conv.customer_name : null,
+    description: messageText,
+    image_path: imagePath,
+    status: 'pending',
+  });
+
+  // Step 5: Reply to customer
+  const reply = imagePath
+    ? "Thanks! I've sent your request to our team. We'll put together a rough visual idea of your sign and share it with you shortly."
+    : "Thanks! Our team will be in touch with some ideas for your sign.";
+
+  await sendReply(client, from, reply);
 }
 
 /**
@@ -723,6 +827,22 @@ async function processMessage({
       bot_reply: URGENT_REPLY,
       response_time_ms: Date.now() - startedAt,
       status: 'handover',
+      attachment_id: attachmentId,
+    });
+    return;
+  }
+
+  // Mockup request â€” if enabled and triggered, short-circuit the normal Claude flow.
+  if (client.mockup_generator_enabled && isMockupRequest(text)) {
+    await handleMockupRequest(client, from, text, imageBase64, imageMimeType);
+    logsManager.addLog({
+      client_id: client.id,
+      client_name: client.name,
+      customer_number: from,
+      customer_message: text,
+      bot_reply: '(mockup request captured)',
+      response_time_ms: Date.now() - startedAt,
+      status: 'success',
       attachment_id: attachmentId,
     });
     return;
@@ -829,7 +949,7 @@ async function processMessage({
       });
       await notifyOwner(client, buildQuoteNotification(quote, from, score), {
         email: true,
-        emailSubject: `New quote request — ${score.temperature.toUpperCase()}`,
+        emailSubject: `New quote request â€” ${score.temperature.toUpperCase()}`,
       });
     }
   }
@@ -857,3 +977,4 @@ module.exports = {
   parseIncomingMessage,
   notifyOwner,
 };
+

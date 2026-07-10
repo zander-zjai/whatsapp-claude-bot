@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const fs = require('fs');
 const crypto = require('crypto');
@@ -16,11 +16,14 @@ const mediaManager = require('./mediaManager');
 const emailNotifier = require('./emailNotifier');
 const settingsManager = require('./settingsManager');
 const { normalizeNumber } = require('./phone');
+const { sendWhatsAppMessage, sendWhatsAppImage } = require('./whatsapp');
+const memory = require('./memory');
+const mockupManager = require('./mockupManager');
 
 const router = express.Router();
 
 // ------------------------------------------------------------------
-// POST /client/login (public — everything else below requires a client JWT)
+// POST /client/login (public â€” everything else below requires a client JWT)
 // Same 5-attempts/15min shape as the admin login limiter.
 // ------------------------------------------------------------------
 const loginLimiter = rateLimit({
@@ -50,13 +53,13 @@ router.post('/login', loginLimiter, (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// Forgot / reset password (public). Same rate limit shape as login —
+// Forgot / reset password (public). Same rate limit shape as login â€”
 // reuse loginLimiter so this can't be used to brute-force or spam emails.
 // ------------------------------------------------------------------
 const RESET_TOKEN_VALIDITY_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * POST /client/forgot-password — always responds with a generic success
+ * POST /client/forgot-password â€” always responds with a generic success
  * message regardless of whether the email matches a client, so this can't
  * be used to enumerate which businesses have an account. If it does match,
  * emails a one-time reset link to the client's contact_email.
@@ -80,7 +83,7 @@ router.post('/forgot-password', loginLimiter, async (req, res) => {
       await emailNotifier.sendOwnerEmail(
         client,
         'Reset your ZJAI client portal password',
-        `Hi ${client.contact_person || ''},\n\nWe received a request to reset your client portal password. Click the link below to set a new one — it's valid for 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
+        `Hi ${client.contact_person || ''},\n\nWe received a request to reset your client portal password. Click the link below to set a new one â€” it's valid for 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
       );
     } catch (err) {
       logError(`[${client.name}] Failed to send password reset email:`, err.message);
@@ -90,7 +93,7 @@ router.post('/forgot-password', loginLimiter, async (req, res) => {
   res.json(genericResponse);
 });
 
-/** POST /client/reset-password — sets a new password given a valid, unexpired reset token. */
+/** POST /client/reset-password â€” sets a new password given a valid, unexpired reset token. */
 router.post('/reset-password', loginLimiter, (req, res) => {
   const { token, password } = req.body || {};
 
@@ -120,7 +123,7 @@ router.use(clientAuth.requireClientAuth);
 // Dashboard
 // ------------------------------------------------------------------
 
-/** GET /client/me — own client info + summary stats for the dashboard. */
+/** GET /client/me â€” own client info + summary stats for the dashboard. */
 router.get('/me', async (req, res) => {
   const client = req.client;
   const conversations = conversationManager.getConversationsForClient(client.id);
@@ -241,13 +244,13 @@ router.get('/me', async (req, res) => {
 // Conversations
 // ------------------------------------------------------------------
 
-/** GET /client/conversations — all of this client's conversations. */
+/** GET /client/conversations â€” all of this client's conversations. */
 router.get('/conversations', (req, res) => {
   const conversations = conversationManager.getConversationsForClient(req.clientId);
   res.json({ conversations });
 });
 
-/** GET /client/conversations/:customerNumber — conversation + full message history.
+/** GET /client/conversations/:customerNumber â€” conversation + full message history.
  *  If the identifier is an email address, returns the email thread instead. */
 router.get('/conversations/:customerNumber', (req, res) => {
   const customerNumber = decodeURIComponent(req.params.customerNumber);
@@ -277,7 +280,7 @@ router.get('/conversations/:customerNumber', (req, res) => {
 });
 
 /**
- * POST /client/conversations/handover — toggle handover for one of this
+ * POST /client/conversations/handover â€” toggle handover for one of this
  * client's conversations (the portal equivalent of #takeover/#release).
  * Body: { customer_number, active }
  */
@@ -294,7 +297,7 @@ router.post('/conversations/handover', (req, res) => {
 });
 
 /**
- * POST /client/conversations/priority — set or clear the owner's manual
+ * POST /client/conversations/priority â€” set or clear the owner's manual
  * priority tier for a customer (high/medium/low/none), independent of the
  * auto-inferred lead_temperature. Body: { customer_number, priority }.
  */
@@ -323,14 +326,14 @@ router.post('/conversations/priority', (req, res) => {
 // Quote requests
 // ------------------------------------------------------------------
 
-/** GET /client/quotes — this client's quote requests, most recent first. */
+/** GET /client/quotes â€” this client's quote requests, most recent first. */
 router.get('/quotes', (req, res) => {
   const { limit } = req.query;
   const quotes = quoteManager.getQuotesForClient(req.clientId, { limit: limit ? Number(limit) : 100 });
   res.json({ quotes });
 });
 
-/** GET /client/quotes/:id — single quote, for the quote detail view. */
+/** GET /client/quotes/:id â€” single quote, for the quote detail view. */
 router.get('/quotes/:id', (req, res) => {
   const quote = quoteManager.getQuoteById(req.params.id);
   if (!quote || quote.client_id !== req.clientId) {
@@ -340,8 +343,8 @@ router.get('/quotes/:id', (req, res) => {
 });
 
 /**
- * GET /client/quotes/:id/attachments — design files/images this customer
- * sent around the time of this quote (window: created_at ± 48h). Media
+ * GET /client/quotes/:id/attachments â€” design files/images this customer
+ * sent around the time of this quote (window: created_at Â± 48h). Media
  * isn't linked to a specific quote at capture time, so this is a heuristic
  * association by customer number + timestamp, not an exact link.
  */
@@ -375,7 +378,7 @@ router.get('/quotes/:id/attachments', (req, res) => {
   });
 });
 
-/** GET /client/attachments/:id/file — stream a stored attachment file. */
+/** GET /client/attachments/:id/file â€” stream a stored attachment file. */
 router.get('/attachments/:id/file', (req, res) => {
   const attachment = mediaManager.getAttachmentById(req.params.id);
   if (!attachment || attachment.client_id !== req.clientId) {
@@ -391,7 +394,7 @@ router.get('/attachments/:id/file', (req, res) => {
 });
 
 /**
- * PATCH /client/quotes/:id — update a quote.
+ * PATCH /client/quotes/:id â€” update a quote.
  * Actions: approve | reject | revise
  * Status overrides: pending | quoted | won | lost | accepted | declined
  */
@@ -436,7 +439,7 @@ router.patch('/quotes/:id', async (req, res) => {
       if (quote.tier !== 2) {
         return res.status(400).json({ error: 'Only Tier 2 quotes can be revised' });
       }
-      // Allow revising quotes in any status — the revision will re-send the PDF
+      // Allow revising quotes in any status â€” the revision will re-send the PDF
       if (!Array.isArray(line_items) || line_items.length === 0) {
         return res.status(400).json({ error: 'line_items are required for a revision' });
       }
@@ -472,7 +475,7 @@ router.patch('/quotes/:id', async (req, res) => {
   return res.status(400).json({ error: 'action or status is required' });
 });
 
-/** GET /client/quotes/:id/pdf — stream the generated PDF for one of this client's Tier 2 quotes. */
+/** GET /client/quotes/:id/pdf â€” stream the generated PDF for one of this client's Tier 2 quotes. */
 router.get('/quotes/:id/pdf', (req, res) => {
   const quote = quoteManager.getQuoteById(req.params.id);
   if (!quote || quote.client_id !== req.clientId || quote.tier !== 2) {
@@ -493,14 +496,14 @@ router.get('/quotes/:id/pdf', (req, res) => {
 // Quote analytics + customer quote history
 // ------------------------------------------------------------------
 
-/** GET /client/quotes/analytics — monthly summary stats for this client's quotes. */
+/** GET /client/quotes/analytics â€” monthly summary stats for this client's quotes. */
 router.get('/quotes/analytics', (req, res) => {
   res.json({ analytics: quoteManager.getQuoteAnalytics(req.clientId) });
 });
 
 /**
 /**
- * GET /client/customers — all unique customers for this client, aggregated from
+ * GET /client/customers â€” all unique customers for this client, aggregated from
  * quote history, with their current margin and summary stats.
  */
 router.get('/customers', (req, res) => {
@@ -553,7 +556,7 @@ router.get('/customers', (req, res) => {
 });
 
 /**
- * GET /client/customers/:identifier/quotes — all quotes ever for a specific
+ * GET /client/customers/:identifier/quotes â€” all quotes ever for a specific
  * customer (identified by their phone number or email address).
  */
 router.get('/customers/:identifier/quotes', (req, res) => {
@@ -569,7 +572,7 @@ router.get('/customers/:identifier/quotes', (req, res) => {
 // Customer margins
 // ------------------------------------------------------------------
 
-/** GET /client/margins — list all customer-specific margins for this client. */
+/** GET /client/margins â€” list all customer-specific margins for this client. */
 router.get('/margins', (req, res) => {
   res.json({
     margins: req.client.customer_margins || [],
@@ -577,7 +580,7 @@ router.get('/margins', (req, res) => {
   });
 });
 
-/** POST /client/margins — add or update a customer margin. */
+/** POST /client/margins â€” add or update a customer margin. */
 router.post('/margins', (req, res) => {
   const { label, phone_number, email, margin_percent } = req.body || {};
   if (!phone_number && !email) {
@@ -590,7 +593,7 @@ router.post('/margins', (req, res) => {
   res.json({ margins });
 });
 
-/** PATCH /client/margins/:id — update label, phone_number, email, or margin_percent on a record. */
+/** PATCH /client/margins/:id â€” update label, phone_number, email, or margin_percent on a record. */
 router.patch('/margins/:id', (req, res) => {
   const { label, phone_number, email, margin_percent } = req.body || {};
   const margins = clientManager.updateCustomerMargin(req.clientId, req.params.id, { label, phone_number, email, margin_percent });
@@ -598,14 +601,14 @@ router.patch('/margins/:id', (req, res) => {
   res.json({ margins });
 });
 
-/** DELETE /client/margins/:id — remove a customer margin by id. */
+/** DELETE /client/margins/:id â€” remove a customer margin by id. */
 router.delete('/margins/:id', (req, res) => {
   const margins = clientManager.removeCustomerMargin(req.clientId, req.params.id);
   if (!margins) return res.status(404).json({ error: 'Margin not found' });
   res.json({ margins });
 });
 
-/** PATCH /client/margins/default — update the default margin percentage. */
+/** PATCH /client/margins/default â€” update the default margin percentage. */
 router.patch('/margins/default', (req, res) => {
   const { margin_percent } = req.body || {};
   if (margin_percent === undefined || margin_percent === null) {
@@ -619,16 +622,16 @@ router.patch('/margins/default', (req, res) => {
 // Email Receptionist thread
 // ------------------------------------------------------------------
 
-/** GET /client/emails — recent email exchanges for this client. */
+/** GET /client/emails â€” recent email exchanges for this client. */
 router.get('/emails', (req, res) => {
   res.json({ emails: emailLogsManager.getLogsForClient(req.clientId, { limit: 100 }) });
 });
 
 // ------------------------------------------------------------------
-// Call logs (proxied from JARVIS — AI Receptionist clients)
+// Call logs (proxied from JARVIS â€” AI Receptionist clients)
 // ------------------------------------------------------------------
 
-/** GET /client/calls — returns call log entries for this client from JARVIS, merged with local callback-done state. */
+/** GET /client/calls â€” returns call log entries for this client from JARVIS, merged with local callback-done state. */
 router.get('/calls', async (req, res) => {
   const callbackDoneStore = require('./callbackDoneStore');
   const jarvisUrl = process.env.JARVIS_URL;
@@ -656,7 +659,7 @@ router.get('/calls', async (req, res) => {
   }
 });
 
-/** PATCH /client/calls/:id/callback-done — mark a callback as handled. */
+/** PATCH /client/calls/:id/callback-done â€” mark a callback as handled. */
 router.patch('/calls/:id/callback-done', (req, res) => {
   const callbackDoneStore = require('./callbackDoneStore');
   callbackDoneStore.markDone(`${req.clientId}:${req.params.id}`);
@@ -667,12 +670,12 @@ router.patch('/calls/:id/callback-done', (req, res) => {
 // Price list (Tier 2 only)
 // ------------------------------------------------------------------
 
-/** GET /client/pricelist — current price list (empty for Tier 1 clients). */
+/** GET /client/pricelist â€” current price list (empty for Tier 1 clients). */
 router.get('/pricelist', (req, res) => {
   res.json({ price_list: req.client.price_list || [] });
 });
 
-/** PUT /client/pricelist — replace the price list. */
+/** PUT /client/pricelist â€” replace the price list. */
 router.put('/pricelist', (req, res) => {
   const { price_list: priceList } = req.body || {};
   const updated = clientManager.updatePriceList(req.clientId, priceList);
@@ -696,13 +699,13 @@ function settingsView(client) {
   };
 }
 
-/** GET /client/settings — editable business settings (never exposes credentials). */
+/** GET /client/settings â€” editable business settings (never exposes credentials). */
 router.get('/settings', (req, res) => {
   res.json({ settings: settingsView(req.client) });
 });
 
 /**
- * PUT /client/settings — update business hours, system prompt, personality,
+ * PUT /client/settings â€” update business hours, system prompt, personality,
  * bot name and contact details. To change the portal password, include
  * `current_password` and `new_password` in the body.
  */
@@ -729,4 +732,108 @@ router.put('/settings', (req, res) => {
   }
 });
 
+// ------------------------------------------------------------------
+// Mockup requests
+// ------------------------------------------------------------------
+
+/** GET /client/mockups — all mockup requests for this client, newest first. */
+router.get('/mockups', (req, res) => {
+  const mockups = mockupManager.getMockupsForClient(req.clientId);
+  res.json({ mockups });
+});
+
+/** GET /client/mockups/:id/image — stream the generated PNG for a mockup. */
+router.get('/mockups/:id/image', (req, res) => {
+  const mockup = mockupManager.getMockupById(req.params.id);
+  if (!mockup || mockup.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Mockup not found' });
+  }
+  if (!mockup.image_path || !fs.existsSync(mockup.image_path)) {
+    return res.status(404).json({ error: 'Image not available' });
+  }
+  res.setHeader('Content-Type', 'image/png');
+  fs.createReadStream(mockup.image_path).pipe(res);
+});
+
+/**
+ * PATCH /client/mockups/:id — approve or decline a mockup.
+ * Body: { action: 'approve' | 'decline' }
+ * On approve: sends the image to the customer via WhatsApp.
+ */
+router.patch('/mockups/:id', async (req, res) => {
+  const mockup = mockupManager.getMockupById(req.params.id);
+  if (!mockup || mockup.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Mockup not found' });
+  }
+
+  const { action } = req.body || {};
+  if (!['approve', 'decline'].includes(action)) {
+    return res.status(400).json({ error: 'action must be "approve" or "decline"' });
+  }
+
+  if (action === 'approve') {
+    if (mockup.image_path && fs.existsSync(mockup.image_path)) {
+      try {
+        const buffer = fs.readFileSync(mockup.image_path);
+        const caption = "Here is a rough idea of how your sign could look. Final design may vary. We will be in touch with your full quote shortly.";
+        await sendWhatsAppImage(req.client, mockup.customer_number, buffer, 'mockup.png', caption);
+      } catch (err) {
+        logError(`[${req.client.name}] Failed to send mockup image to ${mockup.customer_number}:`, err.message);
+        return res.status(502).json({ error: 'Failed to send image via WhatsApp' });
+      }
+    }
+    const updated = mockupManager.setMockupStatus(mockup.id, 'approved');
+    log(`Client portal: ${req.client.name} approved mockup for ${mockup.customer_number}`);
+    return res.json({ mockup: updated });
+  }
+
+  // decline
+  const updated = mockupManager.setMockupStatus(mockup.id, 'declined');
+  log(`Client portal: ${req.client.name} declined mockup for ${mockup.customer_number}`);
+  return res.json({ mockup: updated });
+});
+
+// ------------------------------------------------------------------
+// Send message (owner reply)
+// ------------------------------------------------------------------
+
+/**
+ * POST /client/send-message — send a WhatsApp message from the owner.
+ * Body: { customer_number, message }
+ * Appends to conversation history as an owner-sent assistant message.
+ */
+router.post('/send-message', async (req, res) => {
+  const { customer_number: customerNumber, message } = req.body || {};
+
+  if (!customerNumber || !message) {
+    return res.status(400).json({ error: 'customer_number and message are required' });
+  }
+
+  try {
+    await sendWhatsAppMessage(req.client, customerNumber, message);
+  } catch (err) {
+    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+    logError(`[${req.client.name}] Failed to send owner message to ${customerNumber}: ${detail}`);
+    return res.status(502).json({ error: 'Failed to send WhatsApp message' });
+  }
+
+  // Record in memory (conversation context) and logs
+  memory.addMessage(req.clientId, customerNumber, 'assistant', message);
+  logsManager.addLog({
+    client_id: req.clientId,
+    client_name: req.client.name,
+    customer_number: customerNumber,
+    customer_message: null,
+    bot_reply: message,
+    response_time_ms: 0,
+    status: 'success',
+    sender: 'owner',
+  });
+
+  log(`Client portal: ${req.client.name} sent owner message to ${customerNumber}`);
+  res.json({ ok: true });
+});
+
 module.exports = router;
+
+

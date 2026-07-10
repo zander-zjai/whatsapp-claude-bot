@@ -1,95 +1,147 @@
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+﻿import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
 import {
   getClientConversations,
+  getClientConversation,
   setClientConversationHandover,
-  setClientConversationPriority,
 } from '../../api/clientPortalEndpoints';
+import { sendClientMessage } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
-import { maskPhoneNumber, truncate, formatDateTime, whatsappDeepLink } from '../../utils/format';
+import { maskPhoneNumber } from '../../utils/format';
 
-function conversationStatus(conv) {
-  if (conv.handover_active) return 'handover';
-  if (conv.awaiting_human) return 'awaiting_human';
-  return 'active';
+// --- Helpers ---
+
+function relativeTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'Yesterday';
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
 }
 
-const STATUS_LABELS = {
-  active: 'Active',
-  awaiting_human: 'Awaiting Human',
-  handover: 'Handover',
+function formatMsgTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+}
+
+const LEAD_DOT = {
+  hot: 'bg-red-500',
+  warm: 'bg-orange-400',
+  cold: 'bg-panel-2',
 };
 
-const STATUS_CLASSES = {
-  active: 'bg-green-100 text-green-700',
-  awaiting_human: 'bg-yellow-100 text-yellow-700',
-  handover: 'bg-blue-100 text-blue-700',
-};
+function ConvRow({ conv, selected, onClick }) {
+  const isSelected = selected && selected.customer_number === conv.customer_number;
+  const displayName = conv.customer_name || maskPhoneNumber(conv.customer_number);
+  const leadTemp = conv.lead_temperature;
 
-const LEAD_CLASSES = {
-  hot: 'bg-red-100 text-red-700',
-  warm: 'bg-orange-100 text-orange-700',
-  cold: 'bg-panel-2 text-cream-dim',
-};
-
-function LeadBadge({ temperature, reason }) {
-  if (!temperature) return <span className="text-xs text-grey">—</span>;
   return (
-    <span
-      className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${LEAD_CLASSES[temperature]}`}
-      title={reason || ''}
+    <button
+      type="button"
+      onClick={() => onClick(conv)}
+      className={`relative w-full text-left px-4 py-3 border-b border-line transition-colors ${
+        isSelected ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-panel-2'
+      }`}
     >
-      {temperature}
-    </span>
+      {conv.unread_count > 0 && (
+        <span className="absolute left-1 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary" />
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-medium text-cream">{displayName}</span>
+        <span className="shrink-0 text-xs text-cream-dim">{relativeTime(conv.last_message_at)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-0.5">
+        <span className="truncate text-xs text-cream-dim">{conv.last_message_preview || ''}</span>
+        {leadTemp && (
+          <span
+            className={`shrink-0 text-xs font-medium capitalize px-1.5 py-0.5 rounded-full ${
+              leadTemp === 'hot' ? 'bg-red-500/20 text-red-400' :
+              leadTemp === 'warm' ? 'bg-orange-500/20 text-orange-400' :
+              'bg-panel-2 text-cream-dim'
+            }`}
+          >
+            {leadTemp}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
 
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
-const PRIORITY_SELECT_CLASSES = {
-  high: 'border-red-500/30 bg-red-500/10 text-red-400',
-  medium: 'border-orange-500/30 bg-orange-500/10 text-orange-400',
-  low: 'border-line bg-panel-2 text-cream-dim',
-};
+function ChatBubble({ msg }) {
+  const isOwner = msg.sender === 'owner';
+  const isAssistant = msg.role === 'assistant';
+  const isUser = msg.role === 'user';
+  const isSystem = msg.role === 'system';
 
-function sortByPriority(conversations) {
-  return [...conversations].sort((a, b) => {
-    const pa = PRIORITY_ORDER[a.priority] ?? 3;
-    const pb = PRIORITY_ORDER[b.priority] ?? 3;
-    if (pa !== pb) return pa - pb;
-    return new Date(b.updated_at) - new Date(a.updated_at);
-  });
+  if (isSystem) {
+    return (
+      <div className="flex justify-center my-2">
+        <span className="text-xs text-cream-dim bg-panel-2 rounded-full px-3 py-1">{msg.content || msg.bot_reply}</span>
+      </div>
+    );
+  }
+
+  if (isUser) {
+    return (
+      <div className="flex justify-start mb-3">
+        <div className="max-w-[70%]">
+          <div className="rounded-2xl rounded-tl-sm bg-panel-2 border border-line px-3 py-2 text-sm text-cream">
+            {msg.content || msg.customer_message}
+          </div>
+          <span className="mt-1 block text-xs text-cream-dim">{formatMsgTime(msg.timestamp)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // assistant (Zara/owner)
+  const label = isOwner ? 'You' : (msg.bot_name || 'Zara');
+  return (
+    <div className="flex justify-end mb-3">
+      <div className="max-w-[70%]">
+        <div className="rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-sm text-ink">
+          {msg.content || msg.bot_reply}
+        </div>
+        <span className="mt-1 block text-right text-xs text-cream-dim">{label} · {formatMsgTime(msg.timestamp)}</span>
+      </div>
+    </div>
+  );
 }
 
-const PRIORITY_TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'high', label: 'High' },
-  { key: 'medium', label: 'Medium' },
-  { key: 'low', label: 'Low' },
-  { key: 'none', label: 'None' },
-];
-
 export default function ClientConversations() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('priority') || 'all';
-  const leadFilter = searchParams.get('lead');
-  const awaitingFilter = searchParams.get('awaiting') === 'human';
-  const handoverFilter = searchParams.get('handover') === 'active';
+  const [searchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
-  const [tab, setTab] = useState(PRIORITY_TABS.some((t) => t.key === initialTab) ? initialTab : 'all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [pendingNumber, setPendingNumber] = useState(null);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [handoverPending, setHandoverPending] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  async function load() {
+  async function loadConversations() {
     setLoading(true);
     setError('');
     try {
       const data = await getClientConversations();
-      setConversations(data);
+      const sorted = [...data].sort(
+        (a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0)
+      );
+      setConversations(sorted);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load conversations'));
     } finally {
@@ -98,223 +150,190 @@ export default function ClientConversations() {
   }
 
   useEffect(() => {
-    load();
+    loadConversations();
   }, []);
 
-  async function handleToggleHandover(conv) {
-    const takingOver = !conv.handover_active;
-    setActionError('');
-    setPendingNumber(conv.customer_number);
+  async function selectConversation(conv) {
+    setSelected(conv);
+    setMessages([]);
+    setMsgLoading(true);
     try {
-      const updated = await setClientConversationHandover(conv.customer_number, takingOver);
-      setConversations((prev) =>
-        prev.map((c) => (c.customer_number === conv.customer_number ? updated : c))
-      );
-      // Taking over: open a WhatsApp chat with this customer on the owner's
-      // own number, so they don't have to go find the number themselves.
-      if (takingOver) {
-        const link = whatsappDeepLink(updated.customer_number);
-        if (link) window.open(link, '_blank', 'noopener,noreferrer');
+      const data = await getClientConversation(conv.customer_number);
+      // data.messages is array of log entries with customer_message/bot_reply
+      const msgs = [];
+      for (const log of (data.messages || [])) {
+        if (log.customer_message) {
+          msgs.push({ id: log.id + '-in', role: 'user', customer_message: log.customer_message, timestamp: log.timestamp });
+        }
+        if (log.bot_reply && log.status !== 'handover') {
+          msgs.push({ id: log.id + '-out', role: 'assistant', bot_reply: log.bot_reply, sender: log.sender, timestamp: log.timestamp });
+        }
       }
+      setMessages(msgs);
     } catch (err) {
-      setActionError(getErrorMessage(err, 'Failed to update handover status'));
+      // ignore
     } finally {
-      setPendingNumber(null);
+      setMsgLoading(false);
     }
   }
 
-  async function handlePriorityChange(conv, priority) {
-    setActionError('');
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  async function handleToggleHandover() {
+    if (!selected || handoverPending) return;
+    setHandoverPending(true);
     try {
-      const updated = await setClientConversationPriority(conv.customer_number, priority);
+      const updated = await setClientConversationHandover(selected.customer_number, !selected.handover_active);
+      setSelected(updated);
       setConversations((prev) =>
-        prev.map((c) => (c.customer_number === conv.customer_number ? updated : c))
+        prev.map((c) => (c.customer_number === updated.customer_number ? updated : c))
       );
     } catch (err) {
-      setActionError(getErrorMessage(err, 'Failed to update priority'));
+      // silent
+    } finally {
+      setHandoverPending(false);
     }
   }
 
-  function selectTab(key) {
-    setTab(key);
-    setSearchParams(key === 'all' ? {} : { priority: key });
+  async function handleSend() {
+    if (!replyText.trim() || !selected || sending) return;
+    const text = replyText.trim();
+    setReplyText('');
+    setSending(true);
+    // Optimistic
+    const optimistic = { id: 'opt-' + Date.now(), role: 'assistant', bot_reply: text, sender: 'owner', timestamp: new Date().toISOString() };
+    setMessages((prev) => [...prev, optimistic]);
+    try {
+      await sendClientMessage(selected.customer_number, text);
+    } catch (err) {
+      // revert optimistic
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setReplyText(text);
+    } finally {
+      setSending(false);
+    }
   }
 
-  const filtered = conversations
-    .filter((c) => {
-      if (tab === 'all') return true;
-      if (tab === 'none') return !c.priority;
-      return c.priority === tab;
-    })
-    .filter((c) => !leadFilter || c.lead_temperature === leadFilter)
-    .filter((c) => !awaitingFilter || (c.awaiting_human && !c.handover_active))
-    .filter((c) => !handoverFilter || c.handover_active);
-  const counts = conversations.reduce((acc, c) => {
-    const key = c.priority || 'none';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+  function handleKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey || !e.shiftKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  const filtered = conversations.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (c.customer_name || '').toLowerCase().includes(q) ||
+      (c.customer_number || '').includes(q)
+    );
+  });
+
+  const displayName = selected
+    ? (selected.customer_name || maskPhoneNumber(selected.customer_number))
+    : null;
 
   return (
     <ClientLayout title="Conversations">
-      <div className="mb-4 flex gap-2">
-        {PRIORITY_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => selectTab(t.key)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.key ? 'bg-primary text-ink' : 'border border-line text-cream-dim hover:bg-panel-2'
-            }`}
-          >
-            {t.label} ({t.key === 'all' ? conversations.length : counts[t.key] || 0})
-          </button>
-        ))}
-      </div>
-
-      {leadFilter && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-          Showing {leadFilter} leads only.
-          <button
-            type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.delete('lead');
-              setSearchParams(next);
-            }}
-            className="font-medium underline underline-offset-2"
-          >
-            Clear filter
-          </button>
+      <div
+        className="flex rounded-xl border border-line overflow-hidden bg-panel shadow-sm"
+        style={{ height: 'calc(100vh - 130px)' }}
+      >
+        {/* Left panel */}
+        <div className="w-72 shrink-0 border-r border-line flex flex-col">
+          <div className="p-3 border-b border-line">
+            <input
+              type="text"
+              placeholder="Search conversations…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-cream placeholder-cream-dim focus:outline-none focus:border-primary"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {loading && <div className="p-4 text-sm text-cream-dim">Loading…</div>}
+            {!loading && error && <div className="p-4 text-sm text-red-400">{error}</div>}
+            {!loading && !error && filtered.length === 0 && (
+              <div className="p-4 text-sm text-cream-dim">No conversations yet.</div>
+            )}
+            {filtered.map((conv) => (
+              <ConvRow
+                key={conv.customer_number}
+                conv={conv}
+                selected={selected}
+                onClick={selectConversation}
+              />
+            ))}
+          </div>
         </div>
-      )}
 
-      {awaitingFilter && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-          Showing customers asking for you (a human) only.
-          <button
-            type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.delete('awaiting');
-              setSearchParams(next);
-            }}
-            className="font-medium underline underline-offset-2"
-          >
-            Clear filter
-          </button>
-        </div>
-      )}
+        {/* Right panel */}
+        {!selected ? (
+          <div className="flex-1 flex items-center justify-center text-cream-dim text-sm">
+            Select a conversation to view messages.
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-panel-2 shrink-0">
+              <div>
+                <p className="font-semibold text-cream text-sm">{displayName}</p>
+                <p className="text-xs text-cream-dim">{maskPhoneNumber(selected.customer_number)}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs ${selected.handover_active ? 'text-primary' : 'text-green-400'}`}>
+                  {selected.handover_active ? '● You are handling' : '● Zara is handling'}
+                </span>
+                <button
+                  type="button"
+                  disabled={handoverPending}
+                  onClick={handleToggleHandover}
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-cream-dim hover:bg-panel disabled:opacity-60"
+                >
+                  {selected.handover_active ? 'Hand back to Zara' : 'Take over'}
+                </button>
+              </div>
+            </div>
 
-      {handoverFilter && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
-          Showing conversations in active handover only.
-          <button
-            type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.delete('handover');
-              setSearchParams(next);
-            }}
-            className="font-medium underline underline-offset-2"
-          >
-            Clear filter
-          </button>
-        </div>
-      )}
-
-      <p className="mb-4 text-sm text-cream-dim">{filtered.length} conversation(s)</p>
-
-      {actionError && (
-        <div className="mb-4">
-          <ErrorMessage message={actionError} />
-        </div>
-      )}
-
-      {loading && <LoadingSpinner label="Loading conversations…" />}
-      {!loading && error && <ErrorMessage message={error} />}
-
-      {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-line bg-panel shadow-sm">
-          <table className="min-w-full divide-y divide-line text-sm">
-            <thead className="bg-panel-2">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Customer</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Last Message</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Last Active</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Priority</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Lead</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-cream-dim">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-cream-dim">
-                    No {tab === 'all' ? '' : `${tab} priority `}conversations.
-                  </td>
-                </tr>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {msgLoading && <div className="text-sm text-cream-dim">Loading messages…</div>}
+              {!msgLoading && messages.length === 0 && (
+                <div className="text-sm text-cream-dim">No messages yet.</div>
               )}
-              {sortByPriority(filtered).map((conv) => {
-                const status = conversationStatus(conv);
-                return (
-                  <tr key={conv.customer_number} className="hover:bg-panel-2">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cream-dim">
-                      <Link
-                        to={`/client/conversations/${encodeURIComponent(conv.customer_number)}`}
-                        className="text-primary hover:underline"
-                      >
-                        {conv.customer_name
-                          ? `${conv.customer_name} (${maskPhoneNumber(conv.customer_number)})`
-                          : maskPhoneNumber(conv.customer_number)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-cream" title={conv.last_message_preview}>
-                      {truncate(conv.last_message_preview, 50)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-cream-dim">
-                      {formatDateTime(conv.last_message_at)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <select
-                        value={conv.priority || ''}
-                        onChange={(e) => handlePriorityChange(conv, e.target.value || null)}
-                        className={`rounded-lg border px-2 py-1 text-xs font-medium capitalize ${
-                          conv.priority ? PRIORITY_SELECT_CLASSES[conv.priority] : 'border-line bg-panel-2 text-cream-dim'
-                        }`}
-                      >
-                        <option value="">None</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                      </select>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <LeadBadge temperature={conv.lead_temperature} reason={conv.lead_reason} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_CLASSES[status]}`}>
-                        {STATUS_LABELS[status]}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleHandover(conv)}
-                        disabled={pendingNumber === conv.customer_number}
-                        className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-60"
-                      >
-                        {conv.handover_active ? 'Release to Zara' : 'Take Over'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+              {messages.map((msg) => (
+                <ChatBubble key={msg.id} msg={msg} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Reply box */}
+            <div className="border-t border-line p-3 shrink-0 flex gap-2 items-end">
+              <textarea
+                rows={2}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message… (Enter to send)"
+                className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder-cream-dim resize-none focus:outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending || !replyText.trim()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-ink hover:bg-primary/90 disabled:opacity-50"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </ClientLayout>
   );
 }

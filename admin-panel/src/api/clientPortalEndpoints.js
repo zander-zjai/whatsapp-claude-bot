@@ -1,4 +1,4 @@
-import { clientPortalApi } from './clientPortalClient';
+﻿import { clientPortalApi } from './clientPortalClient';
 
 // --- Auth ---
 export const clientLogin = (email, password) =>
@@ -98,3 +98,19 @@ export const getClientSettings = () =>
 
 export const updateClientSettings = (data) =>
   clientPortalApi.put('/client/settings', data).then((r) => r.data.settings);
+
+// --- Send message (owner reply) ---
+export const sendClientMessage = (customerNumber, message) =>
+  clientPortalApi.post('/client/send-message', { customer_number: customerNumber, message }).then((r) => r.data);
+
+// --- Mockups ---
+export const getClientMockups = () =>
+  clientPortalApi.get('/client/mockups').then((r) => r.data.mockups || []);
+
+export const updateClientMockup = (id, data) =>
+  clientPortalApi.patch(/client/mockups/\, data).then((r) => r.data.mockup);
+
+// Returns the URL string for direct use (auth is handled via blob fetch in the component)
+export const getClientMockupImageUrl = (id) => /client/mockups/\/image;
+
+

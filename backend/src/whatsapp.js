@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const axios = require('axios');
 const FormData = require('form-data');
@@ -99,4 +99,67 @@ async function sendWhatsAppDocument(client, to, buffer, filename, caption) {
   return response.data;
 }
 
-module.exports = { sendWhatsAppMessage, sendWhatsAppDocument };
+/**
+ * Upload an image buffer to the WhatsApp Cloud API media endpoint.
+ *
+ * @param {object} client - Matched client config (phone_number_id, whatsapp_token).
+ * @param {Buffer} buffer - Image file contents.
+ * @param {string} filename - Filename to upload as.
+ * @returns {Promise<string>} The uploaded media id.
+ */
+async function uploadImageMedia(client, buffer, filename) {
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${client.phone_number_id}/media`;
+
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('file', buffer, { filename, contentType: 'image/png' });
+
+  const response = await axios.post(url, form, {
+    headers: {
+      Authorization: `Bearer ${client.whatsapp_token}`,
+      ...form.getHeaders(),
+    },
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
+    timeout: 30000,
+  });
+
+  return response.data.id;
+}
+
+/**
+ * Send an image to a customer via the WhatsApp Cloud API.
+ *
+ * @param {object} client - Matched client config (phone_number_id, whatsapp_token, name).
+ * @param {string} to - Recipient WhatsApp number.
+ * @param {Buffer} buffer - Image file contents (PNG).
+ * @param {string} filename - Filename.
+ * @param {string} caption - Caption text shown with the image.
+ * @returns {Promise<object>} The Graph API response data.
+ */
+async function sendWhatsAppImage(client, to, buffer, filename, caption) {
+  const mediaId = await uploadImageMedia(client, buffer, filename);
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${client.phone_number_id}/messages`;
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'image',
+    image: { id: mediaId, caption },
+  };
+
+  const response = await axios.post(url, payload, {
+    headers: {
+      Authorization: `Bearer ${client.whatsapp_token}`,
+      'Content-Type': 'application/json',
+    },
+    timeout: 30000,
+  });
+
+  log(`[${client.name}] Outgoing image -> ${to}: "${filename}"`);
+  return response.data;
+}
+
+module.exports = { sendWhatsAppMessage, sendWhatsAppDocument, sendWhatsAppImage };
+

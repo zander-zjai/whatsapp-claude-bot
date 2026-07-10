@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const crypto = require('crypto');
 const { readJSON, writeJSON } = require('./fileStore');
@@ -49,6 +49,7 @@ const EDITABLE_FIELDS = [
   'gmail_refresh_token',
   'default_margin',
   'customer_margins',
+  'mockup_generator_enabled',
 ];
 
 const REQUIRED_FIELDS = [
@@ -113,6 +114,7 @@ const DEFAULTS = {
   gmail_refresh_token: '',
   default_margin: 0,
   customer_margins: [],
+  mockup_generator_enabled: false,
 };
 
 // Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
@@ -139,7 +141,7 @@ function sanitizeTeamMembers(list) {
 
 // Fields a client can change themselves via PUT /client/settings. Notably
 // excludes phone_number_id, whatsapp_token, claude_api_key, quote_tier, etc.
-// — those remain owner (admin)-only.
+// â€” those remain owner (admin)-only.
 const CLIENT_PORTAL_SETTINGS_FIELDS = [
   'business_hours',
   'system_prompt',
@@ -408,7 +410,7 @@ function sanitizeClientForPortal(client) {
  * Update the subset of settings a client can change themselves via the
  * client portal (business hours, system prompt, personality, contact
  * details). Never touches phone_number_id, whatsapp_token, claude_api_key,
- * quote_tier, price_list, active, etc. — those stay owner-only.
+ * quote_tier, price_list, active, etc. â€” those stay owner-only.
  */
 function updatePortalSettings(id, data) {
   const client = getClientById(id);
@@ -472,7 +474,7 @@ function setClientPasswordHash(id, hash) {
 }
 
 // ------------------------------------------------------------------
-// Customer margin helpers — stored as client.customer_margins, an array of
+// Customer margin helpers â€” stored as client.customer_margins, an array of
 // { id, label, phone_number, email, margin_percent, created_at } records.
 // Matching is by phone_number (normalised) for WhatsApp/voice, or by email
 // (case-insensitive) for email-channel quotes. Either field is optional but
@@ -643,3 +645,4 @@ module.exports = {
   updateCustomerMargin,
   removeCustomerMargin,
 };
+

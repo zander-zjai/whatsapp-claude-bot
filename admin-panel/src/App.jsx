@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+﻿import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import ClientProtectedRoute from './components/ClientProtectedRoute';
 import Login from './pages/Login';
@@ -27,6 +27,7 @@ import ClientSettings from './pages/client/ClientSettings';
 import ClientCallLogs from './pages/client/ClientCallLogs';
 import ClientLeads from './pages/client/ClientLeads';
 import ClientEmails from './pages/client/ClientEmails';
+import ClientMockups from './pages/client/ClientMockups';
 
 export default function App() {
   return (
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/client/calls" element={<ClientCallLogs />} />
         <Route path="/client/leads" element={<ClientLeads />} />
         <Route path="/client/emails" element={<ClientEmails />} />
+        <Route path="/client/mockups" element={<ClientMockups />} />
         <Route path="/client/conversations" element={<ClientConversations />} />
         <Route path="/client/conversations/:customerNumber" element={<ClientConversationDetail />} />
         <Route path="/client/quotes" element={<ClientQuotes />} />
@@ -71,3 +73,4 @@ export default function App() {
     </Routes>
   );
 }
+

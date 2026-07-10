@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 require('dotenv').config();
 
@@ -24,6 +24,7 @@ const conversationManager = require('./src/conversationManager');
 const quoteManager = require('./src/quoteManager');
 const quoteReminders = require('./src/quoteReminders');
 const bookingsManager = require('./src/bookingsManager');
+const mockupManager = require('./src/mockupManager');
 const mediaManager = require('./src/mediaManager');
 const usageManager = require('./src/usageManager');
 const emailLogsManager = require('./src/emailLogsManager');
@@ -55,6 +56,7 @@ mediaManager.load();
 usageManager.load();
 emailLogsManager.load();
 require('./src/callbackDoneStore').load();
+mockupManager.load();
 emailPoller.startEmailPolling();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
@@ -71,16 +73,16 @@ setInterval(
 ).unref();
 
 if (!process.env.VERIFY_TOKEN) {
-  logError('VERIFY_TOKEN is not set in .env — Meta webhook verification will fail.');
+  logError('VERIFY_TOKEN is not set in .env â€” Meta webhook verification will fail.');
 }
 if (!process.env.JWT_SECRET) {
-  logError('JWT_SECRET is not set in .env — admin panel login will fail.');
+  logError('JWT_SECRET is not set in .env â€” admin panel login will fail.');
 }
 if (!process.env.ADMIN_USER || !process.env.ADMIN_PASS) {
-  logError('ADMIN_USER / ADMIN_PASS are not set in .env — admin panel login will fail.');
+  logError('ADMIN_USER / ADMIN_PASS are not set in .env â€” admin panel login will fail.');
 }
 if (!process.env.APP_SECRET) {
-  log('APP_SECRET is not set — Meta webhook signature verification is DISABLED (set it in production).');
+  log('APP_SECRET is not set â€” Meta webhook signature verification is DISABLED (set it in production).');
 }
 
 const app = express();
@@ -118,7 +120,7 @@ app.use(
 );
 
 // ------------------------------------------------------------------
-// Rate limiting — 100 requests / 15 min per IP on the admin API.
+// Rate limiting â€” 100 requests / 15 min per IP on the admin API.
 // (The /webhook and /health routes are excluded: Meta delivers from a
 // shared pool of IPs and message volume can legitimately be high.)
 // ------------------------------------------------------------------
@@ -137,7 +139,7 @@ app.get('/webhook', verifyWebhook);
 app.post('/webhook', verifyMetaSignature, handleWebhook);
 
 // ------------------------------------------------------------------
-// GET /health — public, used by uptime monitors (e.g. UptimeRobot)
+// GET /health â€” public, used by uptime monitors (e.g. UptimeRobot)
 // ------------------------------------------------------------------
 app.get('/health', (req, res) => {
   res.json({
@@ -153,7 +155,7 @@ app.get('/health', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// POST /handle-email — manual trigger for one email-polling cycle (the
+// POST /handle-email â€” manual trigger for one email-polling cycle (the
 // in-process interval in emailPoller.js already runs this automatically
 // every 2 minutes; this exists for ad-hoc testing/cron without minting an
 // admin JWT). Guarded by a shared secret since it sits outside /admin.
@@ -201,7 +203,7 @@ const server = app.listen(PORT, () => {
 });
 
 // ------------------------------------------------------------------
-// Graceful shutdown — let in-flight requests finish before exiting.
+// Graceful shutdown â€” let in-flight requests finish before exiting.
 // ------------------------------------------------------------------
 function shutdown(signal) {
   log(`${signal} received, shutting down gracefully...`);
@@ -228,3 +230,4 @@ process.on('uncaughtException', (err) => {
   logError('Uncaught exception:', err);
   errorLogger.logErrorToFile('Uncaught exception', err);
 });
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { BUSINESS_TYPES, BOT_PERSONALITIES, SERVICE_PACKAGES } from '../utils/constants';
 import { formatDateTime } from '../utils/format';
 import ErrorMessage from './ErrorMessage';
@@ -40,6 +40,7 @@ export const DEFAULT_CLIENT_VALUES = {
   last_invoice_date: '',
   next_invoice_date: '',
   email_receptionist_enabled: false,
+  mockup_generator_enabled: false,
   email_address: '',
 };
 
@@ -301,7 +302,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
               className={inputClass}
             />
             <p className="mt-1 text-xs text-cream-dim">
-              Internal soft cap for the Usage tab's 80% cost warning — not shown to the client.
+              Internal soft cap for the Usage tab's 80% cost warning â€” not shown to the client.
             </p>
           </div>
         </div>
@@ -552,7 +553,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
                   />
                   <p className="mt-1 text-xs text-cream-dim">
                     Sent to the customer when the owner approves a quote. Leave blank until a
-                    payment provider is set up — falls back to EFT banking details below.
+                    payment provider is set up â€” falls back to EFT banking details below.
                   </p>
                 </div>
 
@@ -611,6 +612,25 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
         )}
       </section>
 
+      {/* Mockup Generator */}
+      <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-cream">Mockup Generator</h2>
+        <label className="flex items-center gap-3">
+          <button
+            type="button"
+            className="switch"
+            data-on={values.mockup_generator_enabled}
+            onClick={() => set('mockup_generator_enabled', !values.mockup_generator_enabled)}
+          >
+            <span />
+          </button>
+          <span className="text-sm text-cream-dim">
+            When a customer asks for a design preview or mockup, Zara captures the request and
+            your team generates and approves a rough visual before sending it to the customer.
+          </span>
+        </label>
+      </section>
+
       {/* Billing */}
       <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-cream">Billing</h2>
@@ -630,7 +650,7 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           <div>
             <label className={labelClass}>Service Package</label>
             <select name="service_package" value={values.service_package} onChange={handleChange} className={inputClass}>
-              <option value="">— Not set —</option>
+              <option value="">â€” Not set â€”</option>
               {SERVICE_PACKAGES.map((pkg) => (
                 <option key={pkg.value} value={pkg.value}>
                   {pkg.label} (R{pkg.price.toLocaleString()}/mo)
@@ -686,9 +706,10 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
           disabled={loading}
           className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-ink hover:bg-primary-700 disabled:opacity-60"
         >
-          {loading ? 'Saving…' : submitLabel}
+          {loading ? 'Savingâ€¦' : submitLabel}
         </button>
       </div>
     </form>
   );
 }
+

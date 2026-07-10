@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -115,7 +115,7 @@ function clearForClient(clientId) {
 }
 
 /**
- * True if a client has Auto PDF Quote enabled — i.e. a non-empty price list
+ * True if a client has Auto PDF Quote enabled â€” i.e. a non-empty price list
  * is configured. When true, completed quote conversations auto-generate a
  * branded PDF that the owner approves in the portal before it's sent.
  * Without a price list, Zara collects the details and notifies the owner
@@ -208,7 +208,7 @@ const EXPIRY_REMINDER_WINDOW_HOURS = 72; // 3-day reminder per spec
 
 /**
  * Sent Tier 2 quotes whose valid_until falls within the next
- * EXPIRY_REMINDER_WINDOW_HOURS and haven't already had a reminder sent —
+ * EXPIRY_REMINDER_WINDOW_HOURS and haven't already had a reminder sent â€”
  * the candidates for the expiry-reminder nudge.
  */
 function getQuotesNeedingExpiryReminder() {
@@ -226,9 +226,9 @@ const FOLLOWUP_MIN_HOURS = 24;
 
 /**
  * Sent Tier 2 quotes older than FOLLOWUP_MIN_HOURS, not yet expired, and
- * not already followed up — candidates for the "still thinking about it?"
+ * not already followed up â€” candidates for the "still thinking about it?"
  * check-in. Doesn't know about conversation activity (that's a cross-module
- * check the caller does against conversationManager) — this only filters
+ * check the caller does against conversationManager) â€” this only filters
  * on the quote record itself.
  */
 function getQuotesNeedingFollowup() {
@@ -264,7 +264,7 @@ function markExpiryReminderSent(id) {
 /**
  * Most recent quote (either tier) for a specific customer number, for
  * injecting "what's the status of my quote" context into Claude's system
- * prompt — undefined if this customer has no quotes on record.
+ * prompt â€” undefined if this customer has no quotes on record.
  */
 function getLatestQuoteForCustomer(clientId, customerNumber) {
   for (let i = quotes.length - 1; i >= 0; i--) {
@@ -350,7 +350,7 @@ function calculateQuoteTotal(priceList, lineItems, marginPercent = 0) {
 
 /**
  * Recalculate totals for revised line items where the owner has manually
- * set unit prices. Takes prices as-is — no price list matching, no margin.
+ * set unit prices. Takes prices as-is â€” no price list matching, no margin.
  */
 function recalculateRevisedItems(lineItems) {
   const items = (Array.isArray(lineItems) ? lineItems : []).map((li) => {
@@ -461,18 +461,25 @@ function markExpiryOwnerNotified(id) {
 // its reply, which extractQuoteRequest() below strips out before the
 // message is sent to the customer.
 // ------------------------------------------------------------------
-const QUOTE_REQUEST_INSTRUCTIONS = `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, gather the details you need through natural, sales-savvy conversation. Ask about the most important things first — what they need, specifications, and quantity — and leave pleasantries like their name until you have the essentials. Do NOT ask for a phone number; you already have their contact via this chat.
+const QUOTE_REQUEST_INSTRUCTIONS = `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, you are Zara — a knowledgeable signage sales consultant. Guide them through a natural, conversational quote process. Ask ONE or TWO questions at a time maximum — never fire off a long list. Be friendly, helpful, and knowledgeable about signage.
 
-Collect these details (in the order that makes sense for the conversation):
-- what they need (the product/service — be specific: type, material, use case)
-- the size or specifications
-- the quantity
-- their name (collect this last, once the key details are confirmed)
+Work through these details in natural conversational flow (do not ask all at once):
+1. TYPE of signage — lightbox, fabricated letters, flat cut letters, pylon sign, billboard, vehicle wrap, banner, window vinyl, or other. If they're unsure, help them identify it with a question or two.
+2. SIZE — width x height in mm or metres. If they don't know, ask for the approximate size or available wall/space dimensions.
+3. MATERIAL — aluminium, PVC, acrylic, steel, or vinyl. If unsure, ask whether it's for indoor or outdoor use and whether illumination is needed — this will guide the material choice.
+4. ILLUMINATION — required or not. If yes: LED front lit, back lit, halo lit, or none.
+5. QUANTITY — how many units do they need.
+6. INSTALLATION — supply only, or supply and install? If install: ask for the address and mounting surface/height.
+7. DESIGN — do they have a ready design file, just a logo to work from, or do they need design help from scratch?
+8. TIMELINE — when do they need it by? Is there an event date or deadline?
+9. CONTACT DETAILS — their name, and email address (you already have their WhatsApp number, so do NOT ask for a phone number).
 
-Once you have ALL FOUR details, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
-[[QUOTE_REQUEST]]{"name":"...","contact_number":"","item_description":"...","size":"...","quantity":"..."}[[/QUOTE_REQUEST]]
+Never guess or assume details — if an answer is vague, probe gently with a follow-up. Once you have captured all nine points, summarise everything back to the customer clearly for confirmation before logging the request. e.g. "Great, let me just confirm what I've got: [summary]. Does that all look right?"
 
-Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
+Only after the customer confirms, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
+[[QUOTE_REQUEST]]{"name":"...","contact_number":"","email":"...","item_description":"...","size":"...","material":"...","illumination":"...","quantity":"...","installation":"...","design_status":"...","timeline":"...","line_items":[]}[[/QUOTE_REQUEST]]
+
+Do not include this block until EVERY field has been confirmed. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`
 
 /**
  * Build the quote-collection system prompt instructions for a client. Tier 2
@@ -488,10 +495,10 @@ function buildQuoteInstructions(client) {
     .map((p) => `- ${p.item} (${p.unit}): R${Number(p.price).toFixed(2)}`)
     .join('\n');
 
-  return `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, gather the details you need through natural, sales-savvy conversation. Lead with the most important questions first — what they need, size/specs, and quantity — and collect their name last once the essentials are confirmed. Do NOT ask for a phone number; you already have their contact via this chat.
+  return `QUOTE REQUESTS: If the customer asks for a price, quote, or estimate, gather the details you need through natural, sales-savvy conversation. Lead with the most important questions first â€” what they need, size/specs, and quantity â€” and collect their name last once the essentials are confirmed. Do NOT ask for a phone number; you already have their contact via this chat.
 
 Collect these details (in the order that makes sense for the conversation):
-- what they need (the specific product/service — type, material, intended use)
+- what they need (the specific product/service â€” type, material, intended use)
 - the size or specifications
 - the quantity
 - their name (collect this last)
@@ -499,10 +506,10 @@ Collect these details (in the order that makes sense for the conversation):
 You have access to this price list:
 ${priceListText}
 
-Once you have ALL FOUR details, use the price list internally to build the line items — but DO NOT state any price or estimate to the customer. Instead, confirm the details back to them and let them know a formal quote will be prepared and sent to them shortly, e.g. "Perfect — I've captured all the details. Our team will review and send you a formal quote as soon as possible." Give a warm, natural close. Do not mention prices, totals, or estimates at all. Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
-[[QUOTE_REQUEST]]{"name":"...","contact_number":"","item_description":"...","size":"...","quantity":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
+Once you have ALL FOUR details, use the price list internally to build the line items â€” but DO NOT state any price or estimate to the customer. Instead, confirm the details back to them and let them know a formal quote will be prepared and sent to them shortly, e.g. "Perfect â€” I've captured all the details. Our team will review and send you a formal quote as soon as possible." Give a warm, natural close. Do not mention prices, totals, or estimates at all. Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this â€” it is removed before the message is sent):
+[[QUOTE_REQUEST]]{"name":"...","contact_number":"","email":"...","item_description":"...","size":"...","material":"...","illumination":"...","quantity":"...","installation":"...","design_status":"...","timeline":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
 
-If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request — if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
+If nothing on the price list matches what they need, use "line_items":[] and let the team price it manually. Do not include this block until every field has been provided. Only include it ONCE per distinct request â€” if you already submitted this exact block earlier in the conversation and the customer is now just saying thanks, goodbye, or asking something unrelated, do NOT include it again. Otherwise, continue the conversation normally.`;
 }
 
 const QUOTE_MARKER_REGEX = /\[\[QUOTE_REQUEST\]\]([\s\S]*?)\[\[\/QUOTE_REQUEST\]\]/;
@@ -550,14 +557,14 @@ const STATUS_DESCRIPTIONS = {
   pending: 'still awaiting approval from our team',
   approved: 'approved and about to be sent to you',
   sent: 'sent to you and awaiting your decision',
-  revised: 'being revised by our team — an updated quote is coming',
-  rejected: 'being reviewed manually by our team — someone will follow up',
-  declined: 'declined — please reach out if you change your mind',
-  accepted: 'accepted — thank you for your business',
+  revised: 'being revised by our team â€” an updated quote is coming',
+  rejected: 'being reviewed manually by our team â€” someone will follow up',
+  declined: 'declined â€” please reach out if you change your mind',
+  accepted: 'accepted â€” thank you for your business',
   quoted: 'quoted and awaiting your decision',
-  won: 'confirmed — thank you for your business',
+  won: 'confirmed â€” thank you for your business',
   lost: 'closed out',
-  expired: 'expired — please reach out for a new quote',
+  expired: 'expired â€” please reach out for a new quote',
 };
 
 /**
@@ -617,3 +624,5 @@ module.exports = {
   deletePdfFile,
   QUOTE_VALIDITY_DAYS,
 };
+
+
