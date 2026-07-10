@@ -108,9 +108,10 @@ export const getClientMockups = () =>
   clientPortalApi.get('/client/mockups').then((r) => r.data.mockups || []);
 
 export const updateClientMockup = (id, data) =>
-  clientPortalApi.patch(/client/mockups/\, data).then((r) => r.data.mockup);
+  clientPortalApi.patch(`/client/mockups/${id}`, data).then((r) => r.data.mockup);
 
 // Returns the URL string for direct use (auth is handled via blob fetch in the component)
-export const getClientMockupImageUrl = (id) => /client/mockups/\/image;
+export const getClientMockupImageUrl = (id) => `/client/mockups/${id}/image`;
+
 
 
