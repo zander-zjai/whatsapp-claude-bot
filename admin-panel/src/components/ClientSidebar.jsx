@@ -1,23 +1,28 @@
-﻿import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useClientAuth } from '../context/ClientAuthContext';
 
 const BASE_NAV_ITEMS = [
-  { to: '/client/dashboard', label: 'Dashboard', icon: 'ðŸ ' },
-  { to: '/client/calls', label: 'Call Logs', icon: 'ðŸ“ž' },
-  { to: '/client/conversations', label: 'Conversations', icon: 'ðŸ’¬' },
-  { to: '/client/emails', label: 'Emails', icon: 'ðŸ“§' },
-  { to: '/client/quotes', label: 'Quote Requests', icon: 'ðŸ“‹' },
-  { to: '/client/customers', label: 'Customers', icon: 'ðŸ‘¥' },
+  { to: '/client/dashboard', label: 'Dashboard', icon: '🏠' },
+  { to: '/client/calls', label: 'Call Logs', icon: '📞' },
+  { to: '/client/conversations', label: 'Conversations', icon: '💬' },
+  { to: '/client/emails', label: 'Emails', icon: '📧' },
+  { to: '/client/quotes', label: 'Quote Requests', icon: '📋' },
+  { to: '/client/customers', label: 'Customers', icon: '👥' },
 ];
 
-const PRICE_LIST_ITEM = { to: '/client/pricelist', label: 'Price List', icon: 'ðŸ’²' };
-const MARGINS_ITEM = { to: '/client/margins', label: 'Margins', icon: 'ðŸ“Š' };
-const SETTINGS_ITEM = { to: '/client/settings', label: 'Settings', icon: 'âš™ï¸' };
+const MOCKUPS_ITEM = { to: '/client/mockups', label: 'Mockups', icon: '🖼️' };
+const PRICE_LIST_ITEM = { to: '/client/pricelist', label: 'Price List', icon: '💲' };
+const SETTINGS_ITEM = { to: '/client/settings', label: 'Settings', icon: '⚙️' };
 
 export default function ClientSidebar({ onNavigate }) {
   const { client, logout } = useClientAuth();
 
-  const navItems = [...BASE_NAV_ITEMS, PRICE_LIST_ITEM, SETTINGS_ITEM];
+  const navItems = [
+    ...BASE_NAV_ITEMS,
+    ...(client?.mockup_generator_enabled ? [MOCKUPS_ITEM] : []),
+    PRICE_LIST_ITEM,
+    SETTINGS_ITEM,
+  ];
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -52,10 +57,9 @@ export default function ClientSidebar({ onNavigate }) {
         onClick={logout}
         className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-cream-dim hover:bg-panel-2 hover:text-red-400"
       >
-        <span>ðŸšª</span>
+        <span>🚪</span>
         <span>Logout</span>
       </button>
     </div>
   );
 }
-
