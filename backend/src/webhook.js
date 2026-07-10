@@ -753,6 +753,62 @@ async function handleMockupRequest(client, from, messageText, imageBase64, image
  *
  * Every processed message is recorded to logs.json for the admin panel.
  */
+async function generateMockupForQuote(client, from, description) {
+  const { getAnthropicClient, resolveApiKey, MODEL } = require('./claude');
+  let visualDescription = description;
+  try {
+    const anthropic = getAnthropicClient(resolveApiKey(client));
+    const resp = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 512,
+      system: 'You are a signage design expert. Write a detailed, specific image generation prompt (2-4 sentences) for a photorealistic image of the sign described. Focus on: sign type, size, materials, colours, text/graphics placement, environment/mounting context. Output only the prompt text — no commentary.',
+      messages: [{ role: 'user', content: description }],
+    });
+    visualDescription = resp.content[0].text.trim();
+  } catch (err) {
+    logError(`[${client.name}] Mockup: Claude description failed:`, err.message);
+  }
+
+  const stabilityKey = process.env.STABILITY_API_KEY;
+  let imagePath = null;
+  if (stabilityKey) {
+    try {
+      const axios = require('axios');
+      const FormData = require('form-data');
+      const form = new FormData();
+      form.append('prompt', `Photorealistic signage mockup: ${visualDescription}`);
+      form.append('output_format', 'png');
+      form.append('aspect_ratio', '16:9');
+      const resp = await axios.post(
+        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        form,
+        {
+          headers: { Authorization: `Bearer ${stabilityKey}`, Accept: 'image/*', ...form.getHeaders() },
+          responseType: 'arraybuffer',
+          timeout: 60000,
+        }
+      );
+      const id = require('crypto').randomUUID();
+      const dir = dataPath(path.join('mockups', client.id));
+      fs.mkdirSync(dir, { recursive: true });
+      imagePath = path.join(dir, `${id}.png`);
+      fs.writeFileSync(imagePath, Buffer.from(resp.data));
+    } catch (err) {
+      logError(`[${client.name}] Mockup: Stability AI failed:`, err.message);
+    }
+  }
+
+  const conv = conversationManager.getConversation(client.id, from);
+  mockupManager.addMockup({
+    client_id: client.id,
+    customer_number: from,
+    customer_name: conv ? conv.customer_name : null,
+    description,
+    image_path: imagePath,
+    status: 'pending',
+  });
+}
+
 async function processMessage({
   from,
   phoneNumberId,
@@ -951,6 +1007,20 @@ async function processMessage({
         email: true,
         emailSubject: `New quote request â€” ${score.temperature.toUpperCase()}`,
       });
+    }
+
+    // Auto-generate a mockup for every quote when mockup_generator_enabled is on.
+    if (client.mockup_generator_enabled) {
+      const mockupDesc = [
+        quote.item_description,
+        quote.size ? `Size: ${quote.size}` : '',
+        quote.material ? `Material: ${quote.material}` : '',
+        quote.illumination && quote.illumination !== 'none' ? `Illumination: ${quote.illumination}` : '',
+        quote.quantity ? `Quantity: ${quote.quantity}` : '',
+      ].filter(Boolean).join('. ');
+      generateMockupForQuote(client, from, mockupDesc).catch((err) =>
+        logError(`[${client.name}] Auto-mockup generation failed:`, err.message)
+      );
     }
   }
 

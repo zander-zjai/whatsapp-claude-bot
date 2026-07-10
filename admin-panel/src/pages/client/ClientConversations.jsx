@@ -1,14 +1,12 @@
-﻿import { useEffect, useRef, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import ClientLayout from '../../components/ClientLayout';
-import LoadingSpinner from '../../components/LoadingSpinner';
-import ErrorMessage from '../../components/ErrorMessage';
 import {
   getClientConversations,
   getClientConversation,
   setClientConversationHandover,
+  sendClientMessage,
+  getClientAttachmentBlob,
 } from '../../api/clientPortalEndpoints';
-import { sendClientMessage } from '../../api/clientPortalEndpoints';
 import { getErrorMessage } from '../../api/client';
 import { maskPhoneNumber } from '../../utils/format';
 
@@ -33,12 +31,6 @@ function formatMsgTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
 }
-
-const LEAD_DOT = {
-  hot: 'bg-red-500',
-  warm: 'bg-orange-400',
-  cold: 'bg-panel-2',
-};
 
 function ConvRow({ conv, selected, onClick }) {
   const isSelected = selected && selected.customer_number === conv.customer_number;
@@ -78,16 +70,44 @@ function ConvRow({ conv, selected, onClick }) {
   );
 }
 
+function AttachmentImage({ attachmentId }) {
+  const [src, setSrc] = useState(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    let url;
+    getClientAttachmentBlob(attachmentId)
+      .then((blob) => {
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => setErr(true));
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [attachmentId]);
+
+  if (err) return <span className="text-xs text-cream-dim italic">📎 Attachment</span>;
+  if (!src) return <span className="text-xs text-cream-dim italic">Loading image…</span>;
+  return (
+    <img
+      src={src}
+      alt="Customer attachment"
+      className="max-w-[240px] max-h-[180px] rounded-lg object-contain cursor-pointer"
+      onClick={() => window.open(src, '_blank')}
+    />
+  );
+}
+
 function ChatBubble({ msg }) {
   const isOwner = msg.sender === 'owner';
-  const isAssistant = msg.role === 'assistant';
   const isUser = msg.role === 'user';
   const isSystem = msg.role === 'system';
 
   if (isSystem) {
     return (
       <div className="flex justify-center my-2">
-        <span className="text-xs text-cream-dim bg-panel-2 rounded-full px-3 py-1">{msg.content || msg.bot_reply}</span>
+        <span className="text-xs text-cream-dim bg-panel-2 rounded-full px-3 py-1">
+          {msg.content || msg.bot_reply}
+        </span>
       </div>
     );
   }
@@ -97,6 +117,9 @@ function ChatBubble({ msg }) {
       <div className="flex justify-start mb-3">
         <div className="max-w-[70%]">
           <div className="rounded-2xl rounded-tl-sm bg-panel-2 border border-line px-3 py-2 text-sm text-cream">
+            {msg.attachment_id ? (
+              <AttachmentImage attachmentId={msg.attachment_id} />
+            ) : null}
             {msg.content || msg.customer_message}
           </div>
           <span className="mt-1 block text-xs text-cream-dim">{formatMsgTime(msg.timestamp)}</span>
@@ -105,7 +128,7 @@ function ChatBubble({ msg }) {
     );
   }
 
-  // assistant (Zara/owner)
+  // assistant / owner reply
   const label = isOwner ? 'You' : (msg.bot_name || 'Zara');
   return (
     <div className="flex justify-end mb-3">
@@ -113,14 +136,15 @@ function ChatBubble({ msg }) {
         <div className="rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-sm text-ink">
           {msg.content || msg.bot_reply}
         </div>
-        <span className="mt-1 block text-right text-xs text-cream-dim">{label} · {formatMsgTime(msg.timestamp)}</span>
+        <span className="mt-1 block text-right text-xs text-cream-dim">
+          {label} · {formatMsgTime(msg.timestamp)}
+        </span>
       </div>
     </div>
   );
 }
 
 export default function ClientConversations() {
-  const [searchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -159,18 +183,29 @@ export default function ClientConversations() {
     setMsgLoading(true);
     try {
       const data = await getClientConversation(conv.customer_number);
-      // data.messages is array of log entries with customer_message/bot_reply
       const msgs = [];
       for (const log of (data.messages || [])) {
         if (log.customer_message) {
-          msgs.push({ id: log.id + '-in', role: 'user', customer_message: log.customer_message, timestamp: log.timestamp });
+          msgs.push({
+            id: log.id + '-in',
+            role: 'user',
+            customer_message: log.customer_message,
+            attachment_id: log.attachment_id || null,
+            timestamp: log.timestamp,
+          });
         }
         if (log.bot_reply && log.status !== 'handover') {
-          msgs.push({ id: log.id + '-out', role: 'assistant', bot_reply: log.bot_reply, sender: log.sender, timestamp: log.timestamp });
+          msgs.push({
+            id: log.id + '-out',
+            role: 'assistant',
+            bot_reply: log.bot_reply,
+            sender: log.sender,
+            timestamp: log.timestamp,
+          });
         }
       }
       setMessages(msgs);
-    } catch (err) {
+    } catch {
       // ignore
     } finally {
       setMsgLoading(false);
@@ -192,7 +227,7 @@ export default function ClientConversations() {
       setConversations((prev) =>
         prev.map((c) => (c.customer_number === updated.customer_number ? updated : c))
       );
-    } catch (err) {
+    } catch {
       // silent
     } finally {
       setHandoverPending(false);
@@ -204,13 +239,17 @@ export default function ClientConversations() {
     const text = replyText.trim();
     setReplyText('');
     setSending(true);
-    // Optimistic
-    const optimistic = { id: 'opt-' + Date.now(), role: 'assistant', bot_reply: text, sender: 'owner', timestamp: new Date().toISOString() };
+    const optimistic = {
+      id: 'opt-' + Date.now(),
+      role: 'assistant',
+      bot_reply: text,
+      sender: 'owner',
+      timestamp: new Date().toISOString(),
+    };
     setMessages((prev) => [...prev, optimistic]);
     try {
       await sendClientMessage(selected.customer_number, text);
-    } catch (err) {
-      // revert optimistic
+    } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setReplyText(text);
     } finally {
@@ -219,7 +258,7 @@ export default function ClientConversations() {
   }
 
   function handleKeyDown(e) {
-    if ((e.metaKey || e.ctrlKey || !e.shiftKey) && e.key === 'Enter') {
+    if (!e.shiftKey && e.key === 'Enter') {
       e.preventDefault();
       handleSend();
     }

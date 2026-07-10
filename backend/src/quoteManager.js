@@ -474,6 +474,8 @@ Work through these details in natural conversational flow (do not ask all at onc
 8. TIMELINE — when do they need it by? Is there an event date or deadline?
 9. CONTACT DETAILS — their name, and email address (you already have their WhatsApp number, so do NOT ask for a phone number).
 
+CRITICAL PRICING RULE: NEVER state, mention, hint at, or reference ANY price, cost, total, rand amount, or estimate on WhatsApp — not even approximate ranges. All pricing is communicated exclusively via a formal PDF quote sent after owner review. If asked how much it costs, tell them the formal quote will cover everything and will be sent shortly.
+
 Never guess or assume details — if an answer is vague, probe gently with a follow-up. Once you have captured all nine points, summarise everything back to the customer clearly for confirmation before logging the request. e.g. "Great, let me just confirm what I've got: [summary]. Does that all look right?"
 
 Only after the customer confirms, append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this — it is removed before the message is sent):
@@ -505,6 +507,8 @@ Collect these details (in the order that makes sense for the conversation):
 
 You have access to this price list:
 ${priceListText}
+
+CRITICAL PRICING RULE: NEVER state, mention, hint at, or reference ANY price, cost, total, rand amount, or estimate on WhatsApp — not even approximate ranges. All pricing is communicated exclusively via a formal PDF quote sent after owner review. If asked how much it costs, tell them the formal quote will cover everything and will be sent shortly. This rule applies at all times, even after collecting all details.
 
 Once you have ALL FOUR details, use the price list internally to build the line items â€” but DO NOT state any price or estimate to the customer. Instead, confirm the details back to them and let them know a formal quote will be prepared and sent to them shortly, e.g. "Perfect â€” I've captured all the details. Our team will review and send you a formal quote as soon as possible." Give a warm, natural close. Do not mention prices, totals, or estimates at all. Then append this exact block to the very end of your reply, on its own line, with nothing after it (the customer will never see this â€” it is removed before the message is sent):
 [[QUOTE_REQUEST]]{"name":"...","contact_number":"","email":"...","item_description":"...","size":"...","material":"...","illumination":"...","quantity":"...","installation":"...","design_status":"...","timeline":"...","line_items":[{"item":"<exact item name from the price list>","quantity":<number>}]}[[/QUOTE_REQUEST]]
