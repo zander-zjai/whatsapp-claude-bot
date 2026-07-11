@@ -19,6 +19,7 @@ const { normalizeNumber } = require('./phone');
 const { sendWhatsAppMessage, sendWhatsAppImage } = require('./whatsapp');
 const memory = require('./memory');
 const mockupManager = require('./mockupManager');
+const { SIGN_PRESETS, SIGN_CONTEXTS } = require('./mockupPresets');
 
 const router = express.Router();
 
@@ -740,6 +741,11 @@ router.put('/settings', (req, res) => {
 // Mockup requests
 // ------------------------------------------------------------------
 
+/** GET /client/mockups/presets — return sign-type presets and context options. */
+router.get('/mockups/presets', (req, res) => {
+  res.json({ presets: SIGN_PRESETS, contexts: SIGN_CONTEXTS });
+});
+
 /** GET /client/mockups — all mockup requests for this client, newest first. */
 router.get('/mockups', (req, res) => {
   const mockups = mockupManager.getMockupsForClient(req.clientId);
@@ -823,13 +829,36 @@ router.post('/mockups/:id/revise', async (req, res) => {
     return res.status(400).json({ error: 'Only pending mockups can be revised' });
   }
 
-  const { instructions } = req.body || {};
-  if (!instructions || !String(instructions).trim()) {
-    return res.status(400).json({ error: 'instructions are required' });
-  }
+  const { instructions, preset: presetId, context: contextId } = req.body || {};
 
-  const trimmedInstructions = String(instructions).trim();
-  const combinedPrompt = `${mockup.description}. Revision: ${trimmedInstructions}`;
+  // Two modes: free-text revision OR preset+context restyle
+  let combinedPrompt;
+  let revisionLabel;
+
+  if (presetId || contextId) {
+    const { SIGN_PRESETS, SIGN_CONTEXTS } = require('./mockupPresets');
+    const presetObj = SIGN_PRESETS.find((p) => p.id === presetId);
+    const contextObj = SIGN_CONTEXTS.find((c) => c.id === contextId);
+    if (!presetObj && !contextObj) {
+      return res.status(400).json({ error: 'Unknown preset or context' });
+    }
+    const customerDesc = (mockup.description || '').replace(/\. Revision:.*$/s, '').replace(/\. Restyle:.*$/s, '').trim();
+    const parts = [
+      contextObj ? contextObj.prompt : '',
+      presetObj ? presetObj.prompt : '',
+      customerDesc,
+    ].filter(Boolean);
+    combinedPrompt = parts.join(' ');
+    revisionLabel = [presetObj && presetObj.label, contextObj && contextObj.label].filter(Boolean).join(' + ');
+  } else {
+    if (!instructions || !String(instructions).trim()) {
+      return res.status(400).json({ error: 'instructions or preset/context are required' });
+    }
+    const trimmedInstructions = String(instructions).trim();
+    const baseDesc = (mockup.description || '').replace(/\. Revision:.*$/s, '').replace(/\. Restyle:.*$/s, '').trim();
+    combinedPrompt = `${baseDesc}. Revision: ${trimmedInstructions}`;
+    revisionLabel = trimmedInstructions;
+  }
 
   // Generate new image via Stability AI
   const stabilityKey = process.env.STABILITY_API_KEY;
@@ -877,7 +906,7 @@ router.post('/mockups/:id/revise', async (req, res) => {
   const updated = mockupManager.applyRevision(mockup.id, {
     newImagePath,
     newDescription: combinedPrompt,
-    revisionInstructions: trimmedInstructions,
+    revisionInstructions: revisionLabel,
   });
 
   log(`Client portal: ${req.client.name} requested revision #${updated.revision_count} for mockup ${mockup.id}`);

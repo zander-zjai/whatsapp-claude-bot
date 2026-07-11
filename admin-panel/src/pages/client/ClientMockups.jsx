@@ -4,6 +4,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
 import {
   getClientMockups,
+  getClientMockupPresets,
   updateClientMockup,
   reviseClientMockup,
   getClientMockupVersionImageBlob,
@@ -87,12 +88,9 @@ function MockupImage({ mockupId, imagePath, version = null }) {
 function RevisionHistory({ mockup }) {
   const versions = mockup.versions || [];
   if (versions.length <= 1) return null;
-
-  // Show all versions except the latest (which is the current card image)
   const history = versions.slice(0, -1).reverse();
-
   return (
-    <div className="mt-4 border-t border-line pt-3">
+    <div className="mt-4 border-t border-line pt-3 px-4 pb-4">
       <p className="text-xs font-medium text-cream-dim mb-2 uppercase tracking-wide">Version history</p>
       <div className="space-y-3">
         {history.map((ver) => (
@@ -100,7 +98,7 @@ function RevisionHistory({ mockup }) {
             <MockupImage mockupId={mockup.id} imagePath={ver.image_path} version={ver.version} />
             <div className="px-3 py-2 bg-panel-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-cream-dim">Version {ver.version}</span>
+                <span className="text-xs text-cream-dim">v{ver.version}</span>
                 <span className="text-xs text-cream-dim">{formatDate(ver.created_at)}</span>
               </div>
               {ver.revision_instructions && (
@@ -114,16 +112,24 @@ function RevisionHistory({ mockup }) {
   );
 }
 
-function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declining, revising }) {
-  const [showReviseInput, setShowReviseInput] = useState(false);
-  const [revisionText, setRevisionText] = useState('');
+function MockupCard({ mockup, presets, contexts, onApprove, onDecline, onRevise, approving, declining, revising }) {
+  const [mode, setMode] = useState(null); // null | 'preset' | 'freetext'
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [selectedContext, setSelectedContext] = useState('isolated');
+  const [freeText, setFreeText] = useState('');
   const isDone = mockup.status !== 'pending';
 
-  function handleReviseSubmit() {
-    if (!revisionText.trim()) return;
-    onRevise(mockup.id, revisionText.trim());
-    setRevisionText('');
-    setShowReviseInput(false);
+  function handlePresetGenerate() {
+    if (!selectedPreset) return;
+    onRevise(mockup.id, { preset: selectedPreset, context: selectedContext });
+    setMode(null);
+  }
+
+  function handleFreeTextGenerate() {
+    if (!freeText.trim()) return;
+    onRevise(mockup.id, { instructions: freeText.trim() });
+    setFreeText('');
+    setMode(null);
   }
 
   return (
@@ -135,7 +141,7 @@ function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declini
           <span className="font-medium text-cream text-sm">
             {mockup.customer_name || maskPhoneNumber(mockup.customer_number)}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <RevisionBadge count={mockup.revision_count} />
             <StatusBadge status={mockup.status} />
           </div>
@@ -147,6 +153,7 @@ function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declini
 
         {!isDone && (
           <>
+            {/* Primary actions */}
             <div className="flex gap-2 mt-4 flex-wrap">
               <button
                 type="button"
@@ -158,11 +165,15 @@ function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declini
               </button>
               <button
                 type="button"
-                onClick={() => setShowReviseInput((v) => !v)}
+                onClick={() => setMode(mode === 'preset' ? null : 'preset')}
                 disabled={revising || approving}
-                className="flex-1 rounded-lg border border-primary/50 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50 transition-colors ${
+                  mode === 'preset'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-primary/50 text-primary hover:bg-primary/10'
+                }`}
               >
-                Request Revision
+                Restyle
               </button>
               <button
                 type="button"
@@ -174,31 +185,89 @@ function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declini
               </button>
             </div>
 
-            {showReviseInput && (
-              <div className="mt-3">
-                <textarea
-                  rows={3}
-                  value={revisionText}
-                  onChange={(e) => setRevisionText(e.target.value)}
-                  placeholder="Describe the changes you want… e.g. make the letters bigger, change background to white, add our logo on the left"
-                  className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-cream placeholder-cream-dim resize-none focus:outline-none focus:border-primary"
-                />
-                <div className="flex gap-2 mt-2">
+            {/* Restyle panel */}
+            {mode === 'preset' && (
+              <div className="mt-4 rounded-lg border border-line bg-panel-2 p-3 space-y-3">
+                {/* Sign type */}
+                <div>
+                  <p className="text-xs font-medium text-cream-dim mb-1.5 uppercase tracking-wide">Sign type</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(presets || []).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPreset(p.id === selectedPreset ? null : p.id)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                          selectedPreset === p.id
+                            ? 'bg-primary text-ink border-primary'
+                            : 'border-line text-cream-dim hover:border-primary/50 hover:text-primary'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Context */}
+                <div>
+                  <p className="text-xs font-medium text-cream-dim mb-1.5 uppercase tracking-wide">Setting</p>
+                  <div className="flex gap-1.5">
+                    {(contexts || []).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedContext(c.id)}
+                        className={`flex-1 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                          selectedContext === c.id
+                            ? 'bg-primary text-ink border-primary'
+                            : 'border-line text-cream-dim hover:border-primary/50 hover:text-primary'
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={handleReviseSubmit}
-                    disabled={!revisionText.trim() || revising}
+                    onClick={handlePresetGenerate}
+                    disabled={!selectedPreset || revising}
                     className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-ink hover:bg-primary/90 disabled:opacity-50"
                   >
-                    {revising ? 'Generating…' : 'Generate Revision'}
+                    {revising ? 'Generating…' : 'Generate'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowReviseInput(false); setRevisionText(''); }}
-                    className="rounded-lg border border-line px-3 py-2 text-sm text-cream-dim hover:bg-panel-2"
+                    onClick={() => setMode(null)}
+                    className="rounded-lg border border-line px-3 py-2 text-sm text-cream-dim hover:bg-panel"
                   >
                     Cancel
                   </button>
+                </div>
+
+                {/* Divider to free-text */}
+                <div className="border-t border-line pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setMode(mode === 'freetext' ? 'preset' : 'freetext')}
+                    className="text-xs text-cream-dim hover:text-primary"
+                  >
+                    {mode === 'freetext' ? '▲ Hide custom instructions' : '+ Add custom instructions'}
+                  </button>
+                  {mode === 'freetext' && (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        rows={2}
+                        value={freeText}
+                        onChange={(e) => setFreeText(e.target.value)}
+                        placeholder="e.g. make the letters bigger, add our logo on the left…"
+                        className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-cream placeholder-cream-dim resize-none focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -213,24 +282,22 @@ function MockupCard({ mockup, onApprove, onDecline, onRevise, approving, declini
 
 export default function ClientMockups() {
   const [mockups, setMockups] = useState([]);
+  const [presets, setPresets] = useState([]);
+  const [contexts, setContexts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState({});
 
-  async function load() {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getClientMockups();
-      setMockups(data);
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load mockups'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    Promise.all([getClientMockups(), getClientMockupPresets()])
+      .then(([mockupData, presetData]) => {
+        setMockups(mockupData);
+        setPresets(presetData.presets || []);
+        setContexts(presetData.contexts || []);
+      })
+      .catch((err) => setError(getErrorMessage(err, 'Failed to load')))
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleAction(id, action) {
     setPending((p) => ({ ...p, [id]: action }));
@@ -244,14 +311,14 @@ export default function ClientMockups() {
     }
   }
 
-  async function handleRevise(id, instructions) {
+  async function handleRevise(id, data) {
     setPending((p) => ({ ...p, [id]: 'revise' }));
     setError('');
     try {
-      const updated = await reviseClientMockup(id, instructions);
+      const updated = await reviseClientMockup(id, data);
       setMockups((prev) => prev.map((m) => (m.id === id ? updated : m)));
     } catch (err) {
-      setError(getErrorMessage(err, 'Revision failed — please try again'));
+      setError(getErrorMessage(err, 'Generation failed — please try again'));
     } finally {
       setPending((p) => { const n = { ...p }; delete n[id]; return n; });
     }
@@ -265,7 +332,9 @@ export default function ClientMockups() {
       {loading && <LoadingSpinner label="Loading mockups…" />}
       {!loading && error && <ErrorMessage message={error} />}
       {!loading && !error && mockups.length === 0 && (
-        <p className="text-cream-dim text-sm">No mockup requests yet. Mockups are auto-generated when a quote comes in.</p>
+        <p className="text-cream-dim text-sm">
+          No mockup requests yet. Mockups are auto-generated when a quote comes in.
+        </p>
       )}
 
       {!loading && pendingMockups.length > 0 && (
@@ -278,6 +347,8 @@ export default function ClientMockups() {
               <MockupCard
                 key={m.id}
                 mockup={m}
+                presets={presets}
+                contexts={contexts}
                 onApprove={(id) => handleAction(id, 'approve')}
                 onDecline={(id) => handleAction(id, 'decline')}
                 onRevise={handleRevise}
@@ -300,6 +371,8 @@ export default function ClientMockups() {
               <MockupCard
                 key={m.id}
                 mockup={m}
+                presets={presets}
+                contexts={contexts}
                 onApprove={(id) => handleAction(id, 'approve')}
                 onDecline={(id) => handleAction(id, 'decline')}
                 onRevise={handleRevise}
