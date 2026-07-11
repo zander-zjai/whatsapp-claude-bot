@@ -696,6 +696,10 @@ function settingsView(client) {
     contact_person: client.contact_person,
     contact_email: client.contact_email,
     contact_phone: client.contact_phone,
+    banking_details: client.banking_details,
+    payment_link_url: client.payment_link_url,
+    mockup_generator_enabled: client.mockup_generator_enabled,
+    mockup_style_prompt: client.mockup_style_prompt,
   };
 }
 
@@ -836,7 +840,8 @@ router.post('/mockups/:id/revise', async (req, res) => {
       const axios = require('axios');
       const FormData = require('form-data');
       const form = new FormData();
-      form.append('prompt', `Photorealistic signage mockup: ${combinedPrompt}`);
+      const stylePrompt = req.client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
+      form.append('prompt', `${stylePrompt} ${combinedPrompt}`);
       form.append('output_format', 'png');
       form.append('aspect_ratio', '16:9');
 

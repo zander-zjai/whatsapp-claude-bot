@@ -693,7 +693,8 @@ async function handleMockupRequest(client, from, messageText, imageBase64, image
       const axios = require('axios');
       const FormData = require('form-data');
       const form = new FormData();
-      form.append('prompt', `Photorealistic signage mockup: ${visualDescription}`);
+      const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
+      form.append('prompt', `${stylePrompt} ${visualDescription}`);
       form.append('output_format', 'png');
       form.append('aspect_ratio', '16:9');
 
@@ -776,7 +777,8 @@ async function generateMockupForQuote(client, from, description) {
       const axios = require('axios');
       const FormData = require('form-data');
       const form = new FormData();
-      form.append('prompt', `Photorealistic signage mockup: ${visualDescription}`);
+      const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
+      form.append('prompt', `${stylePrompt} ${visualDescription}`);
       form.append('output_format', 'png');
       form.append('aspect_ratio', '16:9');
       const resp = await axios.post(

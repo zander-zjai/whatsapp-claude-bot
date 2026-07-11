@@ -50,6 +50,7 @@ const EDITABLE_FIELDS = [
   'default_margin',
   'customer_margins',
   'mockup_generator_enabled',
+  'mockup_style_prompt',
 ];
 
 const REQUIRED_FIELDS = [
@@ -115,6 +116,7 @@ const DEFAULTS = {
   default_margin: 0,
   customer_margins: [],
   mockup_generator_enabled: false,
+  mockup_style_prompt: 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.',
 };
 
 // Google Calendar event colorId values 1-11 (Lavender, Sage, Grape, Flamingo,
@@ -152,6 +154,7 @@ const CLIENT_PORTAL_SETTINGS_FIELDS = [
   'contact_phone',
   'banking_details',
   'payment_link_url',
+  'mockup_style_prompt',
 ];
 
 /**

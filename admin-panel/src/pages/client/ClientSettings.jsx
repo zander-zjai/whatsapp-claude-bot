@@ -36,6 +36,8 @@ export default function ClientSettings() {
   const [businessHours, setBusinessHours] = useState(DEFAULT_BUSINESS_HOURS);
   const [bankingDetails, setBankingDetails] = useState('');
   const [paymentLinkUrl, setPaymentLinkUrl] = useState('');
+  const [mockupStylePrompt, setMockupStylePrompt] = useState('');
+  const [mockupGeneratorEnabled, setMockupGeneratorEnabled] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -55,6 +57,8 @@ export default function ClientSettings() {
         setBusinessHours({ ...DEFAULT_BUSINESS_HOURS, ...(s.business_hours || {}) });
         setBankingDetails(s.banking_details || '');
         setPaymentLinkUrl(s.payment_link_url || '');
+        setMockupGeneratorEnabled(Boolean(s.mockup_generator_enabled));
+        setMockupStylePrompt(s.mockup_style_prompt || '');
       })
       .catch((err) => !cancelled && setLoadError(getErrorMessage(err, 'Failed to load settings')))
       .finally(() => !cancelled && setLoading(false));
@@ -101,6 +105,7 @@ export default function ClientSettings() {
         business_hours: businessHours,
         banking_details: bankingDetails,
         payment_link_url: paymentLinkUrl,
+        mockup_style_prompt: mockupStylePrompt,
       };
       if (newPassword) {
         payload.current_password = currentPassword;
@@ -300,6 +305,22 @@ export default function ClientSettings() {
                   Leave blank until you've set up a payment provider (e.g. Yoco, PayFast).
                 </p>
               </div>
+              {mockupGeneratorEnabled && (
+                <div>
+                  <label className={labelClass}>Mockup Style Instructions</label>
+                  <textarea
+                    value={mockupStylePrompt}
+                    onChange={(e) => setMockupStylePrompt(e.target.value)}
+                    rows={4}
+                    placeholder="e.g. Isolated product shot of the sign only. Clean, plain white background. No buildings or street context. Photorealistic studio render."
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-cream-dim">
+                    Sets the visual style for every auto-generated mockup — background, framing, lighting. This is prepended to the customer&apos;s description before generating.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className={labelClass}>EFT Banking Details</label>
                 <textarea

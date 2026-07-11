@@ -41,6 +41,7 @@ export const DEFAULT_CLIENT_VALUES = {
   next_invoice_date: '',
   email_receptionist_enabled: false,
   mockup_generator_enabled: false,
+  mockup_style_prompt: '',
   email_address: '',
 };
 
@@ -629,6 +630,22 @@ export default function ClientForm({ initialValues, onSubmit, submitLabel, loadi
             your team generates and approves a rough visual before sending it to the customer.
           </span>
         </label>
+
+        {values.mockup_generator_enabled && (
+          <div className="mt-4">
+            <label className={labelClass}>Mockup Style Instructions</label>
+            <textarea
+              rows={4}
+              value={values.mockup_style_prompt || ''}
+              onChange={(e) => set('mockup_style_prompt', e.target.value)}
+              placeholder="e.g. Isolated product shot of the sign only. Clean, plain white background. No buildings or street context. Photorealistic studio render."
+              className={inputClass + ' resize-none'}
+            />
+            <p className="mt-1 text-xs text-cream-dim">
+              This is prepended to every mockup generation prompt. Use it to define the visual style — background, framing, lighting — so every output looks consistent.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Billing */}
