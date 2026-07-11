@@ -742,17 +742,28 @@ router.get('/mockups', (req, res) => {
   res.json({ mockups });
 });
 
-/** GET /client/mockups/:id/image — stream the generated PNG for a mockup. */
+/** GET /client/mockups/:id/image — stream the generated PNG for a mockup.
+ *  Optional ?version=N to serve a specific historical version's image. */
 router.get('/mockups/:id/image', (req, res) => {
   const mockup = mockupManager.getMockupById(req.params.id);
   if (!mockup || mockup.client_id !== req.clientId) {
     return res.status(404).json({ error: 'Mockup not found' });
   }
-  if (!mockup.image_path || !fs.existsSync(mockup.image_path)) {
+
+  let imagePath = mockup.image_path;
+
+  // Serve a historical version if requested
+  const versionNum = req.query.version ? parseInt(req.query.version, 10) : null;
+  if (versionNum && Array.isArray(mockup.versions)) {
+    const ver = mockup.versions.find((v) => v.version === versionNum);
+    if (ver) imagePath = ver.image_path;
+  }
+
+  if (!imagePath || !fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Image not available' });
   }
   res.setHeader('Content-Type', 'image/png');
-  fs.createReadStream(mockup.image_path).pipe(res);
+  fs.createReadStream(imagePath).pipe(res);
 });
 
 /**
@@ -790,6 +801,81 @@ router.patch('/mockups/:id', async (req, res) => {
   // decline
   const updated = mockupManager.setMockupStatus(mockup.id, 'declined');
   log(`Client portal: ${req.client.name} declined mockup for ${mockup.customer_number}`);
+  return res.json({ mockup: updated });
+});
+
+/**
+ * POST /client/mockups/:id/revise — request a revision.
+ * Body: { instructions: string }
+ * Generates a new image via Stability AI using the original description +
+ * revision instructions, then archives the current version into history.
+ */
+router.post('/mockups/:id/revise', async (req, res) => {
+  const mockup = mockupManager.getMockupById(req.params.id);
+  if (!mockup || mockup.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Mockup not found' });
+  }
+  if (mockup.status !== 'pending') {
+    return res.status(400).json({ error: 'Only pending mockups can be revised' });
+  }
+
+  const { instructions } = req.body || {};
+  if (!instructions || !String(instructions).trim()) {
+    return res.status(400).json({ error: 'instructions are required' });
+  }
+
+  const trimmedInstructions = String(instructions).trim();
+  const combinedPrompt = `${mockup.description}. Revision: ${trimmedInstructions}`;
+
+  // Generate new image via Stability AI
+  const stabilityKey = process.env.STABILITY_API_KEY;
+  let newImagePath = null;
+
+  if (stabilityKey) {
+    try {
+      const axios = require('axios');
+      const FormData = require('form-data');
+      const form = new FormData();
+      form.append('prompt', `Photorealistic signage mockup: ${combinedPrompt}`);
+      form.append('output_format', 'png');
+      form.append('aspect_ratio', '16:9');
+
+      const resp = await axios.post(
+        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${stabilityKey}`,
+            Accept: 'image/*',
+            ...form.getHeaders(),
+          },
+          responseType: 'arraybuffer',
+          timeout: 60000,
+        }
+      );
+
+      const path = require('path');
+      const { dataPath } = require('./fileStore');
+      const newId = crypto.randomUUID();
+      const dir = dataPath(path.join('mockups', req.clientId));
+      fs.mkdirSync(dir, { recursive: true });
+      newImagePath = path.join(dir, `${newId}.png`);
+      fs.writeFileSync(newImagePath, Buffer.from(resp.data));
+    } catch (err) {
+      logError(`[portal] Mockup revision Stability AI failed:`, err.message);
+      return res.status(502).json({ error: 'Image generation failed — please try again' });
+    }
+  } else {
+    return res.status(503).json({ error: 'Image generation not configured' });
+  }
+
+  const updated = mockupManager.applyRevision(mockup.id, {
+    newImagePath,
+    newDescription: combinedPrompt,
+    revisionInstructions: trimmedInstructions,
+  });
+
+  log(`Client portal: ${req.client.name} requested revision #${updated.revision_count} for mockup ${mockup.id}`);
   return res.json({ mockup: updated });
 });
 
