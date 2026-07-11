@@ -778,11 +778,37 @@ async function generateMockupForQuote(client, from, description) {
       const FormData = require('form-data');
       const form = new FormData();
       const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-      form.append('prompt', `${stylePrompt} ${visualDescription}`);
+
+      // Check if the customer sent a logo image in the last 7 days
+      const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const windowEnd = new Date().toISOString();
+      const customerImages = mediaManager.getAttachmentsForCustomerInWindow(client.id, from, windowStart, windowEnd);
+      const logoAttachment = customerImages.find((a) => a.mime_type && a.mime_type.startsWith('image/'));
+
+      let finalPrompt = `${stylePrompt} ${visualDescription}`;
+      if (logoAttachment) {
+        finalPrompt += ' Incorporate the customer\'s provided logo and brand artwork prominently into the sign design.';
+      }
+
+      form.append('prompt', finalPrompt);
       form.append('output_format', 'png');
       form.append('aspect_ratio', '16:9');
+
+      // Use image-to-image if we have a logo — Stability AI will blend it into the generation
+      let stabilityEndpoint = 'https://api.stability.ai/v2beta/stable-image/generate/core';
+      if (logoAttachment) {
+        try {
+          const logoBytes = fs.readFileSync(logoAttachment.file_path);
+          form.append('image', logoBytes, { filename: 'logo.png', contentType: logoAttachment.mime_type });
+          form.append('strength', '0.35'); // 65% prompt-driven, 35% reference image
+          stabilityEndpoint = 'https://api.stability.ai/v2beta/stable-image/generate/core';
+        } catch (logoErr) {
+          logError(`[${client.name}] Mockup: Could not read logo file:`, logoErr.message);
+        }
+      }
+
       const resp = await axios.post(
-        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        stabilityEndpoint,
         form,
         {
           headers: { Authorization: `Bearer ${stabilityKey}`, Accept: 'image/*', ...form.getHeaders() },

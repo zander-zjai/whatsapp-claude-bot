@@ -470,7 +470,10 @@ Work through these details in natural conversational flow (do not ask all at onc
 4. ILLUMINATION — required or not. If yes: LED front lit, back lit, halo lit, or none.
 5. QUANTITY — how many units do they need.
 6. INSTALLATION — supply only, or supply and install? If install: ask for the address and mounting surface/height.
-7. DESIGN — do they have a ready design file, just a logo to work from, or do they need design help from scratch?
+7. DESIGN & ARTWORK — ask the following in one conversational message:
+   a) What text/content must appear on the sign? (business name, tagline, phone number, website, slogan — whatever they want displayed)
+   b) Do they have a logo or brand artwork? If yes, ask them to please send it now in this chat (WhatsApp supports image and PDF uploads). Explain it will be included in the sign mockup we prepare for them.
+   c) If they don't have a logo or need design help from scratch, note that — the design team will be in touch.
 8. TIMELINE — when do they need it by? Is there an event date or deadline?
 9. CONTACT DETAILS — their name, and email address (you already have their WhatsApp number, so do NOT ask for a phone number).
 
