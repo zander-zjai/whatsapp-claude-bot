@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -6,12 +7,9 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import Toast, { useToast } from '../../components/Toast';
 import {
   getClientMockups,
-  getClientMockupPresets,
   getClientQuotes,
   updateClientMockup,
-  reviseClientMockup,
   sendQuoteAndMockup,
-  getClientMockupVersionImageBlob,
 } from '../../api/clientPortalEndpoints';
 import { clientPortalApi } from '../../api/clientPortalClient';
 import { getErrorMessage } from '../../api/client';
@@ -47,21 +45,18 @@ function RevisionBadge({ count }) {
   );
 }
 
-function MockupImage({ mockupId, imagePath, version = null, cacheKey = '' }) {
+function MockupImage({ mockupId, imagePath, version = null, cacheKey = '', onImageClick = null }) {
   const [src, setSrc] = useState(null);
 
   useEffect(() => {
     if (!imagePath) return undefined;
     let url;
     let cancelled = false;
-    const fetcher = version !== null
-      ? getClientMockupVersionImageBlob(mockupId, version)
-      : clientPortalApi.get(`/client/mockups/${mockupId}/image`, { responseType: 'blob' }).then((r) => r.data);
-
-    fetcher
-      .then((blob) => {
+    clientPortalApi
+      .get(`/client/mockups/${mockupId}/image`, { params: version !== null ? { version } : {}, responseType: 'blob' })
+      .then((r) => {
         if (cancelled) return;
-        url = URL.createObjectURL(blob);
+        url = URL.createObjectURL(r.data);
         setSrc(url);
       })
       .catch(() => {});
@@ -90,161 +85,24 @@ function MockupImage({ mockupId, imagePath, version = null, cacheKey = '' }) {
       src={src}
       alt={version ? `Version ${version}` : 'Mockup'}
       className="max-h-64 w-full cursor-pointer object-cover"
-      onClick={() => window.open(src, '_blank')}
-      title="Click to view full size"
+      onClick={() => (onImageClick ? onImageClick() : window.open(src, '_blank'))}
+      title={onImageClick ? 'Open to view & redesign' : 'Click to view full size'}
     />
   );
 }
 
-function RevisionHistory({ mockup }) {
-  const [open, setOpen] = useState(false);
-  const versions = mockup.versions || [];
-  if (versions.length <= 1) return null;
-  const history = versions.slice(0, -1).reverse();
 
-  return (
-    <div className="border-t border-line px-4 pb-4 pt-3">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between text-xs font-medium uppercase tracking-wide text-cream-dim hover:text-primary"
-      >
-        <span>Previous versions ({history.length})</span>
-        <span>{open ? '▲' : '▼'}</span>
-      </button>
-      {open && (
-        <div className="mt-3 space-y-3">
-          {history.map((ver) => (
-            <div key={ver.version} className="overflow-hidden rounded-lg border border-line">
-              <MockupImage mockupId={mockup.id} imagePath={ver.image_path} version={ver.version} />
-              <div className="bg-panel-2 px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-cream-dim">Version {ver.version}</span>
-                  <span className="text-xs text-cream-dim">{formatDate(ver.created_at)}</span>
-                </div>
-                {ver.revision_instructions && (
-                  <p className="mt-1 text-xs italic text-cream">"{ver.revision_instructions}"</p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RevisionPanel({ presets, contexts, revising, onGenerate, onCancel }) {
-  const [instructions, setInstructions] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState(null);
-  const [selectedContext, setSelectedContext] = useState(null);
-
-  const canGenerate = instructions.trim() || selectedPreset;
-
-  function handleGenerate() {
-    if (!canGenerate) return;
-    const payload = {};
-    if (instructions.trim()) payload.instructions = instructions.trim();
-    if (selectedPreset) payload.preset = selectedPreset;
-    if (selectedContext) payload.context = selectedContext;
-    onGenerate(payload);
-  }
-
-  return (
-    <div className="mt-4 space-y-3 rounded-lg border border-line bg-panel-2 p-3">
-      <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-cream-dim">
-          What should change?
-        </p>
-        <textarea
-          rows={2}
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder='e.g. "make the letters bigger", "change background to dark blue", "move the logo to the left"'
-          autoFocus
-          className="w-full resize-none rounded-lg border border-line bg-panel px-3 py-2 text-sm text-cream placeholder-cream-dim focus:border-primary focus:outline-none"
-        />
-      </div>
-
-      <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-cream-dim">
-          Change sign type <span className="normal-case text-cream-dim/60">(optional)</span>
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {(presets || []).map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setSelectedPreset(p.id === selectedPreset ? null : p.id)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                selectedPreset === p.id
-                  ? 'border-primary bg-primary text-ink'
-                  : 'border-line text-cream-dim hover:border-primary/50 hover:text-primary'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-cream-dim">
-          Setting <span className="normal-case text-cream-dim/60">(optional)</span>
-        </p>
-        <div className="flex gap-1.5">
-          {(contexts || []).map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setSelectedContext(c.id === selectedContext ? null : c.id)}
-              className={`flex-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                selectedContext === c.id
-                  ? 'border-primary bg-primary text-ink'
-                  : 'border-line text-cream-dim hover:border-primary/50 hover:text-primary'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={!canGenerate || revising}
-          className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-ink hover:bg-primary/90 disabled:opacity-50"
-        >
-          {revising ? 'Generating new version…' : 'Generate New Version'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={revising}
-          className="rounded-lg border border-line px-3 py-2 text-sm text-cream-dim hover:bg-panel disabled:opacity-50"
-        >
-          Cancel
-        </button>
-      </div>
-      {revising && (
-        <p className="text-center text-xs text-cream-dim">
-          This usually takes 10–20 seconds…
-        </p>
-      )}
-    </div>
-  );
-}
-
-function MockupCard({ mockup, presets, contexts, onApprove, onDecline, onRevise, busy }) {
-  const [showRevise, setShowRevise] = useState(false);
+function MockupCard({ mockup, onApprove, onDecline, onOpen, busy }) {
   const isDone = mockup.status !== 'pending';
-  const revising = busy === 'revise';
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-line bg-panel shadow-sm ${isDone ? 'opacity-70' : ''}`}>
-      <MockupImage mockupId={mockup.id} imagePath={mockup.image_path} cacheKey={mockup.updated_at} />
+    <div className={`overflow-hidden rounded-xl border border-line bg-panel shadow-sm ${isDone ? 'opacity-80' : ''}`}>
+      <MockupImage
+        mockupId={mockup.id}
+        imagePath={mockup.image_path}
+        cacheKey={mockup.updated_at}
+        onImageClick={() => onOpen(mockup.id)}
+      />
 
       <div className="p-4">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -261,53 +119,35 @@ function MockupCard({ mockup, presets, contexts, onApprove, onDecline, onRevise,
         </p>
         <p className="mt-2 line-clamp-3 text-sm text-cream">{mockup.description}</p>
 
-        {!isDone && (
-          <>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onApprove(mockup.id)}
-                disabled={!!busy}
-                className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-ink hover:bg-primary/90 disabled:opacity-50"
-              >
-                {busy === 'approve' ? 'Sending…' : 'Approve & Send'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRevise(!showRevise)}
-                disabled={!!busy}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                  showRevise
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-primary/50 text-primary hover:bg-primary/10'
-                }`}
-              >
-                Request Revision
-              </button>
-              <button
-                type="button"
-                onClick={() => onDecline(mockup.id)}
-                disabled={!!busy}
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-50"
-              >
-                {busy === 'decline' ? 'Declining…' : 'Decline'}
-              </button>
-            </div>
+        <button
+          type="button"
+          onClick={() => onOpen(mockup.id)}
+          className="mt-3 w-full rounded-lg border border-primary/50 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+        >
+          View &amp; Redesign →
+        </button>
 
-            {showRevise && (
-              <RevisionPanel
-                presets={presets}
-                contexts={contexts}
-                revising={revising}
-                onGenerate={(payload) => onRevise(mockup.id, payload, () => setShowRevise(false))}
-                onCancel={() => setShowRevise(false)}
-              />
-            )}
-          </>
+        {!isDone && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onApprove(mockup.id)}
+              disabled={!!busy}
+              className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-ink hover:bg-primary/90 disabled:opacity-50"
+            >
+              {busy === 'approve' ? 'Sending…' : 'Approve & Send'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecline(mockup.id)}
+              disabled={!!busy}
+              className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-cream-dim hover:bg-panel-2 disabled:opacity-50"
+            >
+              {busy === 'decline' ? 'Declining…' : 'Decline'}
+            </button>
+          </div>
         )}
       </div>
-
-      <RevisionHistory mockup={mockup} />
     </div>
   );
 }
@@ -367,10 +207,9 @@ function CombinedReadyCard({ pair, sending, onSendBoth }) {
 }
 
 export default function ClientMockups() {
+  const navigate = useNavigate();
   const [mockups, setMockups] = useState([]);
   const [quotes, setQuotes] = useState([]);
-  const [presets, setPresets] = useState([]);
-  const [contexts, setContexts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState({});
@@ -381,13 +220,10 @@ export default function ClientMockups() {
   useEffect(() => {
     Promise.all([
       getClientMockups(),
-      getClientMockupPresets().catch(() => ({ presets: [], contexts: [] })),
       getClientQuotes().catch(() => []),
     ])
-      .then(([mockupData, presetData, quoteData]) => {
+      .then(([mockupData, quoteData]) => {
         setMockups(mockupData);
-        setPresets(presetData.presets || []);
-        setContexts(presetData.contexts || []);
         setQuotes(quoteData || []);
       })
       .catch((err) => setError(getErrorMessage(err, 'Failed to load mockups')))
@@ -402,20 +238,6 @@ export default function ClientMockups() {
       showToast(action === 'approve' ? 'Mockup sent to the customer ✓' : 'Mockup declined');
     } catch (err) {
       showToast(getErrorMessage(err, `Failed to ${action} mockup`), 'error');
-    } finally {
-      setPending((p) => { const n = { ...p }; delete n[id]; return n; });
-    }
-  }
-
-  async function handleRevise(id, payload, onDone) {
-    setPending((p) => ({ ...p, [id]: 'revise' }));
-    try {
-      const updated = await reviseClientMockup(id, payload);
-      setMockups((prev) => prev.map((m) => (m.id === id ? updated : m)));
-      showToast('New version generated — review it below');
-      if (onDone) onDone();
-    } catch (err) {
-      showToast(getErrorMessage(err, 'Generation failed — please try again'), 'error');
     } finally {
       setPending((p) => { const n = { ...p }; delete n[id]; return n; });
     }
@@ -485,7 +307,7 @@ export default function ClientMockups() {
             ))}
           </div>
           <p className="mt-2 text-xs text-cream-dim">
-            Want changes first? Use "Request Revision" on the matching card below — the linked quote stays in the Quote Requests tab.
+            Want changes first? Open the matching card below and use "Redesign" — the linked quote stays in the Quote Requests tab.
           </p>
         </div>
       )}
@@ -500,11 +322,9 @@ export default function ClientMockups() {
               <MockupCard
                 key={m.id}
                 mockup={m}
-                presets={presets}
-                contexts={contexts}
                 onApprove={(id) => handleAction(id, 'approve')}
                 onDecline={(id) => setConfirmDecline(id)}
-                onRevise={handleRevise}
+                onOpen={(id) => navigate(`/client/mockups/${id}`)}
                 busy={pending[m.id]}
               />
             ))}
@@ -517,16 +337,17 @@ export default function ClientMockups() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-cream-dim">
             Completed
           </h2>
+          <p className="mb-3 text-xs text-cream-dim">
+            Already sent — open any card to redesign and send an updated version.
+          </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {doneMockups.map((m) => (
               <MockupCard
                 key={m.id}
                 mockup={m}
-                presets={presets}
-                contexts={contexts}
                 onApprove={(id) => handleAction(id, 'approve')}
                 onDecline={(id) => setConfirmDecline(id)}
-                onRevise={handleRevise}
+                onOpen={(id) => navigate(`/client/mockups/${id}`)}
                 busy={pending[m.id]}
               />
             ))}

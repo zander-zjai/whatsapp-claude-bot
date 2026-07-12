@@ -28,6 +28,7 @@ import ClientCallLogs from './pages/client/ClientCallLogs';
 import ClientLeads from './pages/client/ClientLeads';
 import ClientEmails from './pages/client/ClientEmails';
 import ClientMockups from './pages/client/ClientMockups';
+import ClientMockupDetail from './pages/client/ClientMockupDetail';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/client/leads" element={<ClientLeads />} />
         <Route path="/client/emails" element={<ClientEmails />} />
         <Route path="/client/mockups" element={<ClientMockups />} />
+        <Route path="/client/mockups/:mockupId" element={<ClientMockupDetail />} />
         <Route path="/client/conversations" element={<ClientConversations />} />
         <Route path="/client/conversations/:customerNumber" element={<ClientConversationDetail />} />
         <Route path="/client/quotes" element={<ClientQuotes />} />

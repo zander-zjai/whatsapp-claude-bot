@@ -110,6 +110,10 @@ export const getClientMockups = () =>
 export const updateClientMockup = (id, data) =>
   clientPortalApi.patch(`/client/mockups/${id}`, data).then((r) => r.data.mockup);
 
+// Single mockup + the image files (logo/artwork) the customer sent on WhatsApp
+export const getClientMockup = (id) =>
+  clientPortalApi.get(`/client/mockups/${id}`).then((r) => r.data);
+
 // Returns the URL string for direct use (auth is handled via blob fetch in the component)
 export const getClientMockupImageUrl = (id) => `/client/mockups/${id}/image`;
 

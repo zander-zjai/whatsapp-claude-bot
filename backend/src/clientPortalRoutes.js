@@ -753,6 +753,24 @@ router.get('/mockups', (req, res) => {
   res.json({ mockups });
 });
 
+/** GET /client/mockups/:id — one mockup plus any image files the customer
+ *  sent on WhatsApp (their logo / artwork), so the portal can show what the
+ *  design is based on. Attachments are matched by customer number. */
+router.get('/mockups/:id', (req, res) => {
+  const mockup = mockupManager.getMockupById(req.params.id);
+  if (!mockup || mockup.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Mockup not found' });
+  }
+  // Wide window (customer's whole recent history) so an early-sent logo still shows.
+  const since = new Date(0).toISOString();
+  const until = new Date().toISOString();
+  const attachments = mediaManager
+    .getAttachmentsForCustomerInWindow(req.clientId, mockup.customer_number, since, until)
+    .filter((a) => a.mime_type && a.mime_type.startsWith('image/'))
+    .map((a) => ({ id: a.id, mime_type: a.mime_type, created_at: a.created_at }));
+  res.json({ mockup, attachments });
+});
+
 /** GET /client/mockups/:id/image — stream the generated PNG for a mockup.
  *  Optional ?version=N to serve a specific historical version's image. */
 router.get('/mockups/:id/image', (req, res) => {
@@ -826,10 +844,6 @@ router.post('/mockups/:id/revise', async (req, res) => {
   if (!mockup || mockup.client_id !== req.clientId) {
     return res.status(404).json({ error: 'Mockup not found' });
   }
-  if (mockup.status !== 'pending') {
-    return res.status(400).json({ error: 'Only pending mockups can be revised' });
-  }
-
   const { instructions, preset: presetId, context: contextId } = req.body || {};
 
   // Two modes: free-text revision OR preset+context restyle
@@ -873,17 +887,40 @@ router.post('/mockups/:id/revise', async (req, res) => {
   if (!process.env.STABILITY_API_KEY) {
     return res.status(503).json({ error: 'Image generation not configured' });
   }
+  // Find the customer's own logo/artwork (most recent image they sent) so it
+  // can be carried into every redesign, whatever the new sign type is.
+  const customerImages = mediaManager
+    .getAttachmentsForCustomerInWindow(req.clientId, mockup.customer_number, new Date(0).toISOString(), new Date().toISOString())
+    .filter((a) => a.mime_type && a.mime_type.startsWith('image/') && a.file_path && fs.existsSync(a.file_path));
+  const logo = customerImages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+  let promptText = combinedPrompt;
+  let referenceImagePath = null;
+  let referenceMimeType = null;
+  let strength = 0.6;
+
+  if (logo) {
+    // Prefer the logo as the reference image so branding carries across; the
+    // sign type/changes come from the prompt (kept dominant via low strength).
+    promptText += " Incorporate the customer's provided logo and brand artwork into the sign.";
+    referenceImagePath = logo.file_path;
+    referenceMimeType = logo.mime_type;
+    strength = 0.35;
+  } else if (!presetId && mockup.image_path && fs.existsSync(mockup.image_path)) {
+    // No logo: for a free-text tweak, build on the previous mockup image.
+    referenceImagePath = mockup.image_path;
+    strength = 0.6;
+  }
+
   let newImagePath = null;
   try {
     const stability = require('./stabilityClient');
     const stylePrompt = req.client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-    const hasReference = mockup.image_path && fs.existsSync(mockup.image_path);
     const buffer = await stability.generateSignImage({
-      prompt: `${stylePrompt} ${combinedPrompt}`,
-      // Preset restyles change the whole look, so ignore the reference there;
-      // free-text tweaks keep the previous mockup as the starting point.
-      referenceImagePath: !presetId && hasReference ? mockup.image_path : null,
-      strength: 0.6, // keep some of the previous composition, apply the changes
+      prompt: `${stylePrompt} ${promptText}`,
+      referenceImagePath,
+      referenceMimeType,
+      strength,
     });
     newImagePath = stability.saveMockupImage(req.clientId, buffer);
   } catch (err) {
@@ -891,11 +928,14 @@ router.post('/mockups/:id/revise', async (req, res) => {
     return res.status(502).json({ error: 'Image generation failed — please try again' });
   }
 
-  const updated = mockupManager.applyRevision(mockup.id, {
+  mockupManager.applyRevision(mockup.id, {
     newImagePath,
     newDescription: combinedPrompt,
     revisionInstructions: revisionLabel,
   });
+  // A redesign always returns the mockup to "awaiting review" so the owner can
+  // look at the new version and decide whether to send it.
+  const updated = mockupManager.setMockupStatus(mockup.id, 'pending');
 
   log(`Client portal: ${req.client.name} requested revision #${updated.revision_count} for mockup ${mockup.id}`);
   return res.json({ mockup: updated });
