@@ -3,12 +3,17 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import Toast, { useToast } from '../../components/Toast';
 import {
   getClientQuotes,
   updateClientQuote,
   getClientQuotePdfBlob,
   getClientQuoteAnalytics,
+  getClientMockups,
+  sendQuoteAndMockup,
 } from '../../api/clientPortalEndpoints';
+import { clientPortalApi } from '../../api/clientPortalClient';
 import { getErrorMessage } from '../../api/client';
 import { formatDateTime } from '../../utils/format';
 
@@ -74,6 +79,78 @@ function Daysbadge({ validUntil, status }) {
   return <span className="ml-1 rounded-full bg-panel-2 px-1.5 py-0.5 text-[10px] font-medium text-cream-dim">{days}d left</span>;
 }
 
+function CombinedMockupThumb({ mockupId }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let url;
+    let cancelled = false;
+    clientPortalApi
+      .get(`/client/mockups/${mockupId}/image`, { responseType: 'blob' })
+      .then((r) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(r.data);
+        setSrc(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [mockupId]);
+  if (!src) {
+    return <div className="flex h-32 items-center justify-center bg-panel-2 text-xs text-cream-dim">Loading design…</div>;
+  }
+  return <img src={src} alt="Mockup" className="h-32 w-full object-cover" />;
+}
+
+function CombinedReadyBanner({ pairs, sendingId, onSendBoth }) {
+  const [etas, setEtas] = useState({});
+  if (!pairs.length) return null;
+  return (
+    <div className="mb-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-cream-dim">
+        ✨ Quote + Design Ready ({pairs.length})
+      </h2>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {pairs.map((pair) => (
+          <div key={pair.quote.id} className="overflow-hidden rounded-xl border border-primary/40 bg-panel shadow-sm">
+            <div className="grid sm:grid-cols-2">
+              <CombinedMockupThumb mockupId={pair.mockup.id} />
+              <div className="p-4 text-sm">
+                <p className="font-medium text-cream">{pair.quote.name || pair.quote.customer_number}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs text-cream-dim">{pair.quote.item_description}</p>
+                <p className="mt-1 text-base font-semibold text-cream">
+                  R{Number(pair.quote.total || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </p>
+                <input
+                  type="text"
+                  value={etas[pair.quote.id] || ''}
+                  onChange={(e) => setEtas((prev) => ({ ...prev, [pair.quote.id]: e.target.value }))}
+                  placeholder="ETA e.g. 7-10 working days (optional)"
+                  className="mt-2 w-full rounded-lg border border-line bg-panel-2 px-2 py-1.5 text-xs text-cream placeholder-cream-dim focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="border-t border-line p-3">
+              <button
+                type="button"
+                onClick={() => onSendBoth(pair, etas[pair.quote.id] || '')}
+                disabled={sendingId === pair.quote.id}
+                className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-ink hover:bg-primary/90 disabled:opacity-50"
+              >
+                {sendingId === pair.quote.id ? 'Sending design + quote…' : 'Approve and Send Both'}
+              </button>
+              <p className="mt-1.5 text-center text-[11px] text-cream-dim">
+                Sends the design image first, then the quote PDF with payment details.
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AnalyticsBanner({ analytics }) {
   if (!analytics) return null;
   const fmt = (v) => `R${Number(v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -109,17 +186,23 @@ export default function ClientQuotes() {
   const [pendingId, setPendingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
   const [etaDraft, setEtaDraft] = useState('');
+  const [mockups, setMockups] = useState([]);
+  const [confirmReject, setConfirmReject] = useState(null);
+  const [sendingBothId, setSendingBothId] = useState(null);
+  const { toast, showToast } = useToast();
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const [data, analyticsData] = await Promise.all([
+      const [data, analyticsData, mockupData] = await Promise.all([
         getClientQuotes(),
         getClientQuoteAnalytics().catch(() => null),
+        getClientMockups().catch(() => []),
       ]);
       setQuotes(data);
       setAnalytics(analyticsData);
+      setMockups(mockupData || []);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load quote requests'));
     } finally {
@@ -144,6 +227,7 @@ export default function ClientQuotes() {
       setQuotes((prev) => prev.map((q) => (q.id === quote.id ? updated : q)));
       setApprovingId(null);
       setEtaDraft('');
+      showToast('Quote sent to the customer ✓');
     } catch (err) {
       setActionError(getErrorMessage(err, 'Failed to approve quote'));
     } finally {
@@ -157,10 +241,25 @@ export default function ClientQuotes() {
     try {
       const updated = await updateClientQuote(quote.id, { action: 'reject' });
       setQuotes((prev) => prev.map((q) => (q.id === quote.id ? updated : q)));
+      showToast('Quote declined');
     } catch (err) {
       setActionError(getErrorMessage(err, 'Failed to reject quote'));
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function handleSendBoth(pair, eta) {
+    setSendingBothId(pair.quote.id);
+    try {
+      const result = await sendQuoteAndMockup(pair.quote.id, pair.mockup.id, eta);
+      setQuotes((prev) => prev.map((q) => (q.id === result.quote.id ? result.quote : q)));
+      setMockups((prev) => prev.map((m) => (m.id === result.mockup.id ? result.mockup : m)));
+      showToast('Design and quote sent to the customer ✓');
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Failed to send — please try again'), 'error');
+    } finally {
+      setSendingBothId(null);
     }
   }
 
@@ -198,6 +297,21 @@ export default function ClientQuotes() {
     }
   }
 
+  // Pair approvable quotes with pending mockups for the same customer
+  const normalizeNum = (n) => String(n || '').replace(/\D/g, '');
+  const combinedPairs = quotes
+    .filter((q) => q.tier === 2 && ['pending', 'revised'].includes(q.status))
+    .map((q) => {
+      const mockup = mockups.find(
+        (m) =>
+          m.status === 'pending' &&
+          m.image_path &&
+          normalizeNum(m.customer_number) === normalizeNum(q.customer_number)
+      );
+      return mockup ? { quote: q, mockup } : null;
+    })
+    .filter(Boolean);
+
   const visibleQuotes = quotes.filter((q) => tabForStatus(q.status) === tab);
   const counts = quotes.reduce((acc, q) => {
     const t = tabForStatus(q.status);
@@ -208,6 +322,9 @@ export default function ClientQuotes() {
   return (
     <ClientLayout title="Quote Requests">
       <AnalyticsBanner analytics={analytics} />
+      {!loading && !error && (
+        <CombinedReadyBanner pairs={combinedPairs} sendingId={sendingBothId} onSendBoth={handleSendBoth} />
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -312,7 +429,7 @@ export default function ClientQuotes() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleReject(quote)}
+                              onClick={() => setConfirmReject(quote)}
                               disabled={pendingId === quote.id}
                               className="flex-1 rounded-lg border border-red-500/30 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-60"
                             >
@@ -374,6 +491,20 @@ export default function ClientQuotes() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmReject}
+        title="Decline this quote request?"
+        message={confirmReject ? `The quote for ${confirmReject.name || confirmReject.customer_number} won't be sent to the customer.` : ''}
+        confirmLabel="Decline"
+        danger
+        onConfirm={() => {
+          handleReject(confirmReject);
+          setConfirmReject(null);
+        }}
+        onCancel={() => setConfirmReject(null)}
+      />
+      <Toast toast={toast} />
     </ClientLayout>
   );
 }

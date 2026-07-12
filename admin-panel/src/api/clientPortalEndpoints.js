@@ -119,6 +119,10 @@ export const reviseClientMockup = (id, data) =>
 export const getClientMockupPresets = () =>
   clientPortalApi.get('/client/mockups/presets').then((r) => r.data);
 
+// Send a linked mockup image + quote PDF to the customer in one action
+export const sendQuoteAndMockup = (quoteId, mockupId, eta) =>
+  clientPortalApi.post('/client/send-both', { quote_id: quoteId, mockup_id: mockupId, eta }).then((r) => r.data);
+
 export const getClientMockupVersionImageBlob = (id, version) =>
   clientPortalApi
     .get(`/client/mockups/${id}/image`, { params: { version }, responseType: 'blob' })

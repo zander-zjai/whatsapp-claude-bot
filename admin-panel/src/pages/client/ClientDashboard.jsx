@@ -184,6 +184,62 @@ export default function ClientDashboard() {
             <p className="text-sm text-cream-dim">Here's an overview of your Zara services.</p>
           </div>
 
+          {(() => {
+            const attention = [
+              {
+                to: '/client/conversations?awaiting=human',
+                icon: '🙋',
+                count: summary.awaiting_human,
+                label: 'customers waiting for you',
+                cta: 'Reply now',
+              },
+              {
+                to: '/client/quotes',
+                icon: '📋',
+                count: summary.pending_quotes,
+                label: 'quotes awaiting your approval',
+                cta: 'Review quotes',
+              },
+              ...(client?.mockup_generator_enabled
+                ? [{
+                    to: '/client/mockups',
+                    icon: '🖼️',
+                    count: summary.pending_mockups || 0,
+                    label: 'design mockups awaiting approval',
+                    cta: 'Review designs',
+                  }]
+                : []),
+            ].filter((a) => a.count > 0);
+
+            return (
+              <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
+                  ⚡ Needs Your Attention
+                </h3>
+                {attention.length === 0 ? (
+                  <p className="text-sm text-cream-dim">Nothing waiting — you're all caught up. 🎉</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {attention.map((a) => (
+                      <Link
+                        key={a.to}
+                        to={a.to}
+                        className="flex items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3 transition-colors hover:border-primary"
+                      >
+                        <span className="text-2xl">{a.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-xl font-bold leading-tight text-cream">{a.count}</p>
+                          <p className="text-xs leading-tight text-cream-dim">{a.label}</p>
+                          <p className="mt-0.5 text-xs font-medium text-primary">{a.cta} →</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <LinkedStatsCard to="/client/conversations" label="Messages Today" value={summary.messages_today} icon="💬" />
             <LinkedStatsCard

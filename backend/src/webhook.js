@@ -685,98 +685,10 @@ async function handleMockupRequest(client, from, messageText, imageBase64, image
   }
 
   // Step 2: Call Stability AI to generate the image.
-  const stabilityKey = process.env.STABILITY_API_KEY;
   let imagePath = null;
-
-  if (stabilityKey && visualDescription) {
+  if (process.env.STABILITY_API_KEY) {
     try {
-      const axios = require('axios');
-      const FormData = require('form-data');
-      const form = new FormData();
-      const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-      form.append('prompt', `${stylePrompt} ${visualDescription}`);
-      form.append('output_format', 'png');
-      form.append('aspect_ratio', '16:9');
-
-      const resp = await axios.post(
-        'https://api.stability.ai/v2beta/stable-image/generate/core',
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${stabilityKey}`,
-            Accept: 'image/*',
-            ...form.getHeaders(),
-          },
-          responseType: 'arraybuffer',
-          timeout: 60000,
-        }
-      );
-
-      const mockupId = require('crypto').randomUUID();
-      const dir = dataPath(path.join('mockups', client.id));
-      fs.mkdirSync(dir, { recursive: true });
-      imagePath = path.join(dir, `${mockupId}.png`);
-      fs.writeFileSync(imagePath, Buffer.from(resp.data));
-    } catch (err) {
-      logError(`[${client.name}] Mockup: Stability AI generation failed:`, err.message);
-    }
-  }
-
-  // Step 3: Get customer name from conversation
-  const conv = conversationManager.getConversation(client.id, from);
-
-  // Step 4: Store mockup record
-  mockupManager.addMockup({
-    client_id: client.id,
-    customer_number: from,
-    customer_name: conv ? conv.customer_name : null,
-    description: messageText,
-    image_path: imagePath,
-    status: 'pending',
-  });
-
-  // Step 5: Reply to customer
-  const reply = imagePath
-    ? "Thanks! I've sent your request to our team. We'll put together a rough visual idea of your sign and share it with you shortly."
-    : "Thanks! Our team will be in touch with some ideas for your sign.";
-
-  await sendReply(client, from, reply);
-}
-
-/**
- * Core pipeline. Order of operations:
- *  1. Owner commands (#takeover / #release) - handled and stopped here.
- *  2. Record the message + learn the customer's name if introduced.
- *  3. Active handover - Zara stays silent, message just logged.
- *  4. Urgent keywords - canned "connect you with someone" reply + owner ping.
- *  5. Outside business hours - closed-hours auto-reply.
- *  6. Normal flow - Claude reply, returning-customer greeting, quote capture.
- *
- * Every processed message is recorded to logs.json for the admin panel.
- */
-async function generateMockupForQuote(client, from, description) {
-  const { getAnthropicClient, resolveApiKey, MODEL } = require('./claude');
-  let visualDescription = description;
-  try {
-    const anthropic = getAnthropicClient(resolveApiKey(client));
-    const resp = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 512,
-      system: 'You are a signage design expert. Write a detailed, specific image generation prompt (2-4 sentences) for a photorealistic image of the sign described. Focus on: sign type, size, materials, colours, text/graphics placement, environment/mounting context. Output only the prompt text — no commentary.',
-      messages: [{ role: 'user', content: description }],
-    });
-    visualDescription = resp.content[0].text.trim();
-  } catch (err) {
-    logError(`[${client.name}] Mockup: Claude description failed:`, err.message);
-  }
-
-  const stabilityKey = process.env.STABILITY_API_KEY;
-  let imagePath = null;
-  if (stabilityKey) {
-    try {
-      const axios = require('axios');
-      const FormData = require('form-data');
-      const form = new FormData();
+      const stability = require('./stabilityClient');
       const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
 
       // Check if the customer sent a logo image in the last 7 days
@@ -787,40 +699,16 @@ async function generateMockupForQuote(client, from, description) {
 
       let finalPrompt = `${stylePrompt} ${visualDescription}`;
       if (logoAttachment) {
-        finalPrompt += ' Incorporate the customer\'s provided logo and brand artwork prominently into the sign design.';
+        finalPrompt += " Incorporate the customer's provided logo and brand artwork prominently into the sign design.";
       }
 
-      form.append('prompt', finalPrompt);
-      form.append('output_format', 'png');
-      form.append('aspect_ratio', '16:9');
-
-      // Use image-to-image if we have a logo — Stability AI will blend it into the generation
-      let stabilityEndpoint = 'https://api.stability.ai/v2beta/stable-image/generate/core';
-      if (logoAttachment) {
-        try {
-          const logoBytes = fs.readFileSync(logoAttachment.file_path);
-          form.append('image', logoBytes, { filename: 'logo.png', contentType: logoAttachment.mime_type });
-          form.append('strength', '0.35'); // 65% prompt-driven, 35% reference image
-          stabilityEndpoint = 'https://api.stability.ai/v2beta/stable-image/generate/core';
-        } catch (logoErr) {
-          logError(`[${client.name}] Mockup: Could not read logo file:`, logoErr.message);
-        }
-      }
-
-      const resp = await axios.post(
-        stabilityEndpoint,
-        form,
-        {
-          headers: { Authorization: `Bearer ${stabilityKey}`, Accept: 'image/*', ...form.getHeaders() },
-          responseType: 'arraybuffer',
-          timeout: 60000,
-        }
-      );
-      const id = require('crypto').randomUUID();
-      const dir = dataPath(path.join('mockups', client.id));
-      fs.mkdirSync(dir, { recursive: true });
-      imagePath = path.join(dir, `${id}.png`);
-      fs.writeFileSync(imagePath, Buffer.from(resp.data));
+      const buffer = await stability.generateSignImage({
+        prompt: finalPrompt,
+        referenceImagePath: logoAttachment ? logoAttachment.file_path : null,
+        referenceMimeType: logoAttachment ? logoAttachment.mime_type : null,
+        strength: 0.35, // 65% prompt-driven, 35% logo reference
+      });
+      imagePath = stability.saveMockupImage(client.id, buffer);
     } catch (err) {
       logError(`[${client.name}] Mockup: Stability AI failed:`, err.message);
     }

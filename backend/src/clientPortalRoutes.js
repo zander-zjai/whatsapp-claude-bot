@@ -194,6 +194,7 @@ router.get('/me', async (req, res) => {
       missed_calls_total: missedCallsCount,
       emails_today: emailLogsManager.getTodayCountForClient(client.id),
       active_handovers: activeHandovers.length,
+      pending_mockups: mockupManager.getMockupsForClient(client.id).filter((m) => m.status === 'pending').length,
     },
     recent_calls: recentCalls,
     active_handovers: activeHandovers.slice(0, 5).map((c) => ({
@@ -850,6 +851,12 @@ router.post('/mockups/:id/revise', async (req, res) => {
     ].filter(Boolean);
     combinedPrompt = parts.join(' ');
     revisionLabel = [presetObj && presetObj.label, contextObj && contextObj.label].filter(Boolean).join(' + ');
+    // Free-text instructions can accompany a preset restyle
+    if (instructions && String(instructions).trim()) {
+      const extra = String(instructions).trim();
+      combinedPrompt += `. ${extra}`;
+      revisionLabel += ` — ${extra}`;
+    }
   } else {
     if (!instructions || !String(instructions).trim()) {
       return res.status(400).json({ error: 'instructions or preset/context are required' });
@@ -860,47 +867,28 @@ router.post('/mockups/:id/revise', async (req, res) => {
     revisionLabel = trimmedInstructions;
   }
 
-  // Generate new image via Stability AI
-  const stabilityKey = process.env.STABILITY_API_KEY;
-  let newImagePath = null;
-
-  if (stabilityKey) {
-    try {
-      const axios = require('axios');
-      const FormData = require('form-data');
-      const form = new FormData();
-      const stylePrompt = req.client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-      form.append('prompt', `${stylePrompt} ${combinedPrompt}`);
-      form.append('output_format', 'png');
-      form.append('aspect_ratio', '16:9');
-
-      const resp = await axios.post(
-        'https://api.stability.ai/v2beta/stable-image/generate/core',
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${stabilityKey}`,
-            Accept: 'image/*',
-            ...form.getHeaders(),
-          },
-          responseType: 'arraybuffer',
-          timeout: 60000,
-        }
-      );
-
-      const path = require('path');
-      const { dataPath } = require('./fileStore');
-      const newId = crypto.randomUUID();
-      const dir = dataPath(path.join('mockups', req.clientId));
-      fs.mkdirSync(dir, { recursive: true });
-      newImagePath = path.join(dir, `${newId}.png`);
-      fs.writeFileSync(newImagePath, Buffer.from(resp.data));
-    } catch (err) {
-      logError(`[portal] Mockup revision Stability AI failed:`, err.message);
-      return res.status(502).json({ error: 'Image generation failed — please try again' });
-    }
-  } else {
+  // Generate new image via Stability AI, using the current mockup image as
+  // a reference so revisions build on the previous version instead of
+  // starting from scratch.
+  if (!process.env.STABILITY_API_KEY) {
     return res.status(503).json({ error: 'Image generation not configured' });
+  }
+  let newImagePath = null;
+  try {
+    const stability = require('./stabilityClient');
+    const stylePrompt = req.client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
+    const hasReference = mockup.image_path && fs.existsSync(mockup.image_path);
+    const buffer = await stability.generateSignImage({
+      prompt: `${stylePrompt} ${combinedPrompt}`,
+      // Preset restyles change the whole look, so ignore the reference there;
+      // free-text tweaks keep the previous mockup as the starting point.
+      referenceImagePath: !presetId && hasReference ? mockup.image_path : null,
+      strength: 0.6, // keep some of the previous composition, apply the changes
+    });
+    newImagePath = stability.saveMockupImage(req.clientId, buffer);
+  } catch (err) {
+    logError(`[portal] Mockup revision Stability AI failed:`, err.message);
+    return res.status(502).json({ error: 'Image generation failed — please try again' });
   }
 
   const updated = mockupManager.applyRevision(mockup.id, {
@@ -911,6 +899,80 @@ router.post('/mockups/:id/revise', async (req, res) => {
 
   log(`Client portal: ${req.client.name} requested revision #${updated.revision_count} for mockup ${mockup.id}`);
   return res.json({ mockup: updated });
+});
+
+/**
+ * POST /client/send-both — approve and send a linked mockup + quote together.
+ * Body: { quote_id, mockup_id, eta }
+ * Sends the mockup image first ("visual concept" caption), then approves the
+ * quote which sends the PDF with payment details. Both are logged.
+ */
+router.post('/send-both', async (req, res) => {
+  const { quote_id: quoteId, mockup_id: mockupId, eta } = req.body || {};
+  if (!quoteId || !mockupId) {
+    return res.status(400).json({ error: 'quote_id and mockup_id are required' });
+  }
+
+  const quote = quoteManager.getQuoteById(quoteId);
+  const mockup = mockupManager.getMockupById(mockupId);
+  if (!quote || quote.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Quote not found' });
+  }
+  if (!mockup || mockup.client_id !== req.clientId) {
+    return res.status(404).json({ error: 'Mockup not found' });
+  }
+  if (normalizeNumber(quote.customer_number) !== normalizeNumber(mockup.customer_number)) {
+    return res.status(400).json({ error: 'Quote and mockup belong to different customers' });
+  }
+  const approvableStatuses = ['pending', 'revised', 'needs_pricing'];
+  if (quote.tier !== 2 || !approvableStatuses.includes(quote.status)) {
+    return res.status(400).json({ error: 'This quote cannot be approved' });
+  }
+  if (mockup.status !== 'pending') {
+    return res.status(400).json({ error: 'This mockup has already been actioned' });
+  }
+  if (!mockup.image_path || !fs.existsSync(mockup.image_path)) {
+    return res.status(400).json({ error: 'Mockup image is not available' });
+  }
+
+  // 1. Send the mockup image
+  try {
+    const buffer = fs.readFileSync(mockup.image_path);
+    await sendWhatsAppImage(req.client, mockup.customer_number, buffer, 'mockup.png',
+      "Here's a visual concept of your sign \u{1F3A8}");
+  } catch (err) {
+    logError(`[${req.client.name}] send-both: failed to send mockup image:`, err.message);
+    return res.status(502).json({ error: 'Failed to send the mockup image via WhatsApp' });
+  }
+  mockupManager.setMockupStatus(mockup.id, 'approved');
+  logsManager.addLog({
+    client_id: req.clientId,
+    client_name: req.client.name,
+    customer_number: mockup.customer_number,
+    customer_message: null,
+    bot_reply: "[Mockup image sent] Here's a visual concept of your sign",
+    response_time_ms: 0,
+    status: 'success',
+  });
+
+  // 2. Approve the quote — sends the PDF with payment details and logs it
+  const result = await quoteActions.approveQuote(req.client, quote, eta);
+  if (!result.ok) {
+    const message = result.reason === 'pdf_missing'
+      ? 'Mockup sent, but the quote PDF could not be found.'
+      : 'Mockup sent, but sending the quote failed. Please retry from the Quotes tab.';
+    return res.status(502).json({
+      error: message,
+      mockup: mockupManager.getMockupById(mockup.id),
+      quote: quoteManager.getQuoteById(quote.id),
+    });
+  }
+
+  log(`Client portal: ${req.client.name} sent quote + mockup together to ${mockup.customer_number}`);
+  return res.json({
+    quote: quoteManager.getQuoteById(quote.id),
+    mockup: mockupManager.getMockupById(mockup.id),
+  });
 });
 
 // ------------------------------------------------------------------

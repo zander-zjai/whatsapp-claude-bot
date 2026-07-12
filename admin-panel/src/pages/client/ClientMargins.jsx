@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ClientLayout from '../../components/ClientLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import {
   getClientMargins,
   addClientMargin,
@@ -31,6 +32,7 @@ export default function ClientMargins() {
   const [adding, setAdding] = useState(false);
 
   const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -162,7 +164,8 @@ export default function ClientMargins() {
                       <td className="py-2 font-mono text-xs text-cream-dim">{m.phone_number}</td>
                       <td className="py-2 text-right font-medium text-green-400">{toDisplay(m.margin_percent)}% off</td>
                       <td className="py-2 pl-2">
-                        <button type="button" onClick={() => handleDelete(m.id)} disabled={deletingId === m.id}
+                        <button type="button" onClick={() => setConfirmDelete(m)} disabled={deletingId === m.id}
+                          title="Remove this discount"
                           className="text-red-400 hover:text-red-300 disabled:opacity-60">✕</button>
                       </td>
                     </tr>
@@ -197,6 +200,19 @@ export default function ClientMargins() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Remove this discount?"
+        message={confirmDelete ? `${confirmDelete.label || confirmDelete.phone_number} will go back to the default discount.` : ''}
+        confirmLabel="Remove"
+        danger
+        onConfirm={() => {
+          handleDelete(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </ClientLayout>
   );
 }
