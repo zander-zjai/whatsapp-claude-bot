@@ -57,6 +57,7 @@ usageManager.load();
 emailLogsManager.load();
 require('./src/callbackDoneStore').load();
 mockupManager.load();
+require('./src/mockupReferences').load();
 emailPoller.startEmailPolling();
 
 // Drop error-log files older than 7 days, then once a day thereafter.
@@ -113,6 +114,9 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // X-Hub-Signature-256 header.
 app.use(
   express.json({
+    // Larger limit so the admin can upload reference signage images (and
+    // customers' logos) as base64. Trusted, auth-gated endpoints.
+    limit: '25mb',
     verify: (req, res, buf) => {
       req.rawBody = buf;
     },

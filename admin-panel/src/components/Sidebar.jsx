@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/clients/new', label: 'Add New Client', icon: '➕' },
   { to: '/conversations', label: 'Conversations', icon: '💬' },
   { to: '/quotes', label: 'Quote Requests', icon: '📋' },
+  { to: '/mockup-references', label: 'Mockup References', icon: '🖼️' },
   { to: '/billing', label: 'Billing', icon: '💰' },
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ];

@@ -69,6 +69,16 @@ function setMockupStatus(id, status) {
   return mockup;
 }
 
+/** Merge arbitrary fields onto a mockup record (e.g. logo_offset, logo_scale). */
+function setMockupFields(id, fields) {
+  const mockup = getMockupById(id);
+  if (!mockup) return undefined;
+  Object.assign(mockup, fields || {});
+  mockup.updated_at = new Date().toISOString();
+  persist();
+  return mockup;
+}
+
 /**
  * Apply a revision: archive the current image into versions[], update the
  * active image_path and description, and increment revision_count.
@@ -105,6 +115,7 @@ module.exports = {
   getMockupsForClient,
   getMockupById,
   setMockupStatus,
+  setMockupFields,
   applyRevision,
   persist,
 };

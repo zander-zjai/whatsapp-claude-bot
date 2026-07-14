@@ -11,6 +11,7 @@ import Conversations from './pages/Conversations';
 import QuoteRequests from './pages/QuoteRequests';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
+import MockupReferences from './pages/MockupReferences';
 import ClientLogin from './pages/client/ClientLogin';
 import ClientForgotPassword from './pages/client/ClientForgotPassword';
 import ClientResetPassword from './pages/client/ClientResetPassword';
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/clients/:id/logs" element={<ClientLogs />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/quotes" element={<QuoteRequests />} />
+        <Route path="/mockup-references" element={<MockupReferences />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

@@ -109,7 +109,7 @@ function CombinedReadyBanner({ pairs, sendingId, onSendBoth }) {
   return (
     <div className="mb-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-cream-dim">
-        ✨ Quote + Design Ready ({pairs.length})
+        ✨ Quote + Mockup Ready ({pairs.length})
       </h2>
       <div className="grid gap-4 lg:grid-cols-2">
         {pairs.map((pair) => (
@@ -312,6 +312,12 @@ export default function ClientQuotes() {
     })
     .filter(Boolean);
 
+  // Customers who have a deferred (manual/fabricated) mockup — their quotes
+  // show a "design to follow" reminder instead of a combined card.
+  const deferredCustomers = new Set(
+    mockups.filter((m) => m.deferred && m.status === 'pending').map((m) => normalizeNum(m.customer_number))
+  );
+
   const visibleQuotes = quotes.filter((q) => tabForStatus(q.status) === tab);
   const counts = quotes.reduce((acc, q) => {
     const t = tabForStatus(q.status);
@@ -406,6 +412,11 @@ export default function ClientQuotes() {
                         {STATUS_LABELS[quote.status] || quote.status}
                       </span>
                       <Daysbadge validUntil={quote.valid_until} status={quote.status} />
+                      {deferredCustomers.has(normalizeNum(quote.customer_number)) && (
+                        <span className="mt-1 block text-[10px] font-medium text-amber-400">
+                          🛠️ Design mockup to follow after approval
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col gap-1.5" style={{ minWidth: 160 }}>

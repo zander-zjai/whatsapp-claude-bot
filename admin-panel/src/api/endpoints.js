@@ -57,3 +57,22 @@ export const getQuotePdfBlob = (id) =>
 // --- Email Receptionist ---
 export const getGmailAuthUrl = (clientId) =>
   apiClient.post(`/admin/clients/${clientId}/gmail-auth-url`).then((r) => r.data.url);
+
+// --- Mockup reference library ---
+export const getMockupReferences = () =>
+  apiClient.get('/admin/mockup-references').then((r) => r.data);
+
+export const getMockupReferenceImageUrl = (id) =>
+  `${apiClient.defaults.baseURL}/admin/mockup-references/${id}/image`;
+
+export const getMockupReferenceImageBlob = (id) =>
+  apiClient.get(`/admin/mockup-references/${id}/image`, { responseType: 'blob' }).then((r) => r.data);
+
+export const addMockupReference = (data) =>
+  apiClient.post('/admin/mockup-references', data).then((r) => r.data.reference);
+
+export const updateMockupReference = (id, data) =>
+  apiClient.patch(`/admin/mockup-references/${id}`, data).then((r) => r.data.reference);
+
+export const deleteMockupReference = (id) =>
+  apiClient.delete(`/admin/mockup-references/${id}`).then((r) => r.data);

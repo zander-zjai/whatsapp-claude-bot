@@ -94,15 +94,24 @@ function MockupImage({ mockupId, imagePath, version = null, cacheKey = '', onIma
 
 function MockupCard({ mockup, onApprove, onDecline, onOpen, busy }) {
   const isDone = mockup.status !== 'pending';
+  const isDeferred = !!mockup.deferred;
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-line bg-panel shadow-sm ${isDone ? 'opacity-80' : ''}`}>
-      <MockupImage
-        mockupId={mockup.id}
-        imagePath={mockup.image_path}
-        cacheKey={mockup.updated_at}
-        onImageClick={() => onOpen(mockup.id)}
-      />
+    <div className={`overflow-hidden rounded-xl border bg-panel shadow-sm ${isDeferred ? 'border-amber-500/40' : 'border-line'} ${isDone ? 'opacity-80' : ''}`}>
+      {isDeferred ? (
+        <div className="flex h-40 flex-col items-center justify-center gap-1 bg-amber-500/10 px-4 text-center">
+          <span className="text-2xl">🛠️</span>
+          <p className="text-sm font-semibold text-amber-400">Manual design</p>
+          <p className="text-xs text-amber-300/80">Mockup to be created after approval</p>
+        </div>
+      ) : (
+        <MockupImage
+          mockupId={mockup.id}
+          imagePath={mockup.image_path}
+          cacheKey={mockup.updated_at}
+          onImageClick={() => onOpen(mockup.id)}
+        />
+      )}
 
       <div className="p-4">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -110,6 +119,11 @@ function MockupCard({ mockup, onApprove, onDecline, onOpen, busy }) {
             {mockup.customer_name || maskPhoneNumber(mockup.customer_number)}
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
+            {mockup.manual_design_needed && (
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
+                ⏰ Design now
+              </span>
+            )}
             <RevisionBadge count={mockup.revision_count} />
             <StatusBadge status={mockup.status} />
           </div>
@@ -124,10 +138,10 @@ function MockupCard({ mockup, onApprove, onDecline, onOpen, busy }) {
           onClick={() => onOpen(mockup.id)}
           className="mt-3 w-full rounded-lg border border-primary/50 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
         >
-          View &amp; Redesign →
+          {isDeferred ? 'Open details →' : 'View & Adjust →'}
         </button>
 
-        {!isDone && (
+        {!isDone && !isDeferred && (
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
@@ -159,7 +173,7 @@ function CombinedReadyCard({ pair, sending, onSendBoth }) {
   return (
     <div className="overflow-hidden rounded-xl border border-primary/40 bg-panel shadow-sm">
       <div className="border-b border-primary/30 bg-primary/10 px-4 py-2">
-        <p className="text-sm font-semibold text-primary">✨ Quote + Design Ready</p>
+        <p className="text-sm font-semibold text-primary">✨ Quote + Mockup Ready</p>
         <p className="text-xs text-cream-dim">
           {quote.name || maskPhoneNumber(quote.customer_number)} — send both in one go
         </p>
@@ -294,7 +308,7 @@ export default function ClientMockups() {
       {!loading && !error && combinedPairs.length > 0 && (
         <div className="mb-8">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-cream-dim">
-            Ready to Send Together ({combinedPairs.length})
+            Quote + Mockup Ready ({combinedPairs.length})
           </h2>
           <div className="grid gap-4 lg:grid-cols-2">
             {combinedPairs.map((pair) => (

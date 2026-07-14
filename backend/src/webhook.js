@@ -654,75 +654,121 @@ function isMockupRequest(text) {
 }
 
 /**
- * Handle a mockup request: get Claude to write a visual description, call
- * Stability AI to generate an image, store the result, and acknowledge the
- * customer. Returns early so the normal Claude reply is skipped.
+ * Find the most recent logo/artwork image the customer sent on WhatsApp.
+ * Returns the attachment record (with file_path/mime_type) or null.
  */
-async function handleMockupRequest(client, from, messageText, imageBase64, imageMimeType) {
-  const { getAnthropicClient, resolveApiKey, MODEL } = require('./claude');
+function findCustomerLogo(clientId, from) {
+  const since = new Date(0).toISOString();
+  const until = new Date().toISOString();
+  const images = mediaManager
+    .getAttachmentsForCustomerInWindow(clientId, from, since, until)
+    .filter((a) => a.mime_type && a.mime_type.startsWith('image/') && a.file_path && fs.existsSync(a.file_path));
+  if (!images.length) return null;
+  return images.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+}
 
-  // Step 1: Ask Claude for a detailed visual description for image generation.
-  let visualDescription = '';
-  try {
-    const anthropic = getAnthropicClient(resolveApiKey(client));
-    const userContent = imageBase64
-      ? [
-          { type: 'image', source: { type: 'base64', media_type: imageMimeType, data: imageBase64 } },
-          { type: 'text', text: messageText },
-        ]
-      : messageText;
+/**
+ * Extract likely on-sign text from a description (customer's business name /
+ * sign copy) — used as a fallback overlay when no logo image was sent.
+ */
+function extractSignText(quote, description) {
+  if (quote && quote.name) return quote.name;
+  return String(description || '').split(/[.\n]/)[0].slice(0, 40);
+}
 
-    const descResp = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 512,
-      system: 'You are a signage design expert. The customer wants a visual mockup of their sign. Write a detailed, specific image generation prompt (2-4 sentences) for a photorealistic image of the sign they described. Focus on: sign type, size, materials, colours, text/graphics placement, environment/mounting context. Do not include any commentary â€” output only the prompt text.',
-      messages: [{ role: 'user', content: userContent }],
-    });
-    visualDescription = descResp.content[0].text.trim();
-  } catch (err) {
-    logError(`[${client.name}] Mockup: Failed to get visual description from Claude:`, err.message);
-    visualDescription = messageText; // fall back to raw message
-  }
-
-  // Step 2: Call Stability AI to generate the image.
-  let imagePath = null;
-  if (process.env.STABILITY_API_KEY) {
-    try {
-      const stability = require('./stabilityClient');
-      const stylePrompt = client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-
-      // Check if the customer sent a logo image in the last 7 days
-      const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const windowEnd = new Date().toISOString();
-      const customerImages = mediaManager.getAttachmentsForCustomerInWindow(client.id, from, windowStart, windowEnd);
-      const logoAttachment = customerImages.find((a) => a.mime_type && a.mime_type.startsWith('image/'));
-
-      let finalPrompt = `${stylePrompt} ${visualDescription}`;
-      if (logoAttachment) {
-        finalPrompt += " Incorporate the customer's provided logo and brand artwork prominently into the sign design.";
-      }
-
-      const buffer = await stability.generateSignImage({
-        prompt: finalPrompt,
-        referenceImagePath: logoAttachment ? logoAttachment.file_path : null,
-        referenceMimeType: logoAttachment ? logoAttachment.mime_type : null,
-        strength: 0.35, // 65% prompt-driven, 35% logo reference
-      });
-      imagePath = stability.saveMockupImage(client.id, buffer);
-    } catch (err) {
-      logError(`[${client.name}] Mockup: Stability AI failed:`, err.message);
-    }
-  }
+/**
+ * Build a mockup for a quote using logo compositing (flat signage) or, for
+ * fabricated letters / unrecognised types, a deferred manual-design record.
+ * This replaces the old AI-generation path.
+ *
+ * `signText` — text to composite if the customer sent no logo image.
+ */
+async function generateMockupForQuote(client, from, description, signText = '') {
+  const signClassifier = require('./signClassifier');
+  const mockupReferences = require('./mockupReferences');
+  const compositor = require('./mockupCompositor');
 
   const conv = conversationManager.getConversation(client.id, from);
+  const customerName = conv ? conv.customer_name : null;
+  const { category, deferred } = signClassifier.classify(description);
+
+  // Fabricated letters / unknown types → defer to a manual design task.
+  if (deferred) {
+    mockupManager.addMockup({
+      client_id: client.id,
+      customer_number: from,
+      customer_name: customerName,
+      description,
+      sign_type: category || 'other',
+      deferred: true,
+      image_path: null,
+      status: 'pending',
+      deferred_note:
+        'Professional design mockup will be provided after quote approval.',
+    });
+    log(`[${client.name}] Mockup deferred (manual design) for ${maskPhone(from)} — ${category || 'unknown type'}`);
+    return;
+  }
+
+  // Flat signage → composite the customer's logo (or their sign text) onto the
+  // best-matching reference image.
+  const reference = mockupReferences.pickBest(category);
+  if (!reference) {
+    // No reference image configured for this category yet — defer so the owner
+    // still gets a record and can add a reference / design manually.
+    mockupManager.addMockup({
+      client_id: client.id,
+      customer_number: from,
+      customer_name: customerName,
+      description,
+      sign_type: category,
+      deferred: true,
+      image_path: null,
+      status: 'pending',
+      deferred_note:
+        `No ${category.replace(/_/g, ' ')} reference image is set up yet — add one under Mockup References, or provide a design manually.`,
+    });
+    logError(`[${client.name}] Mockup: no reference for category "${category}" — deferred.`);
+    return;
+  }
+
+  const logo = findCustomerLogo(client.id, from);
+  let imagePath = null;
+  try {
+    const buffer = await compositor.composite({
+      referencePath: reference.image_path,
+      logoBuffer: logo ? fs.readFileSync(logo.file_path) : null,
+      text: logo ? '' : extractSignText(null, signText || description),
+      zone: reference.logo_zone,
+    });
+    imagePath = compositor.saveMockupImage(client.id, buffer);
+  } catch (err) {
+    logError(`[${client.name}] Mockup: compositing failed:`, err.message);
+  }
+
   mockupManager.addMockup({
     client_id: client.id,
     customer_number: from,
-    customer_name: conv ? conv.customer_name : null,
+    customer_name: customerName,
     description,
+    sign_type: category,
+    deferred: false,
+    reference_id: reference.id,
+    logo_offset: { x: 0, y: 0 },
+    logo_scale: 1,
+    used_logo: !!logo,
     image_path: imagePath,
     status: 'pending',
   });
+  log(`[${client.name}] Mockup composited (${category}, ${logo ? 'logo' : 'text'}) for ${maskPhone(from)}`);
+}
+
+/**
+ * Keyword-triggered mockup request from the customer ("show me a mockup").
+ * Uses the same compositing pipeline as the quote flow.
+ */
+async function handleMockupRequest(client, from, messageText) {
+  await generateMockupForQuote(client, from, messageText, messageText);
 }
 
 async function processMessage({

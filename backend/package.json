@@ -27,7 +27,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "pdfkit": "^0.15.2"
+    "pdfkit": "^0.15.2",
+    "sharp": "^0.35.3"
   },
   "license": "MIT"
 }

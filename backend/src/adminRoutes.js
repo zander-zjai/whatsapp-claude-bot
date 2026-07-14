@@ -16,6 +16,7 @@ const quoteManager = require('./quoteManager');
 const usageManager = require('./usageManager');
 const gmailClient = require('./gmailClient');
 const emailPoller = require('./emailPoller');
+const mockupReferences = require('./mockupReferences');
 
 const router = express.Router();
 
@@ -421,6 +422,83 @@ router.get('/quotes/:id/pdf', (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="quote-${quote.id.slice(0, 8)}.pdf"`);
   fs.createReadStream(pdfPath).pipe(res);
+});
+
+// ------------------------------------------------------------------
+// Mockup reference library (compositing sources for flat signage)
+// ------------------------------------------------------------------
+
+/** GET /admin/mockup-references — categories + all references (no image bytes). */
+router.get('/mockup-references', (req, res) => {
+  res.json({
+    categories: mockupReferences.CATEGORIES,
+    references: mockupReferences.list().map((r) => ({
+      id: r.id,
+      category: r.category,
+      name: r.name,
+      logo_zone: r.logo_zone,
+      created_at: r.created_at,
+    })),
+  });
+});
+
+/** GET /admin/mockup-references/:id/image — stream a reference image. */
+router.get('/mockup-references/:id/image', (req, res) => {
+  const ref = mockupReferences.getById(req.params.id);
+  if (!ref || !fs.existsSync(ref.image_path)) {
+    return res.status(404).json({ error: 'Reference not found' });
+  }
+  res.setHeader('Content-Type', ref.mime_type || 'image/png');
+  fs.createReadStream(ref.image_path).pipe(res);
+});
+
+/**
+ * POST /admin/mockup-references — add a reference image.
+ * Body: { category, name, image_base64 } where image_base64 may be a raw
+ * base64 string or a data URL.
+ */
+router.post('/mockup-references', (req, res) => {
+  const { category, name, image_base64: imageBase64 } = req.body || {};
+  if (!category || !imageBase64) {
+    return res.status(400).json({ error: 'category and image_base64 are required' });
+  }
+  let mimeType = 'image/png';
+  let b64 = imageBase64;
+  const dataUrlMatch = /^data:(image\/[a-zA-Z+]+);base64,(.*)$/s.exec(imageBase64);
+  if (dataUrlMatch) {
+    mimeType = dataUrlMatch[1];
+    b64 = dataUrlMatch[2];
+  }
+  let buffer;
+  try {
+    buffer = Buffer.from(b64, 'base64');
+    if (!buffer.length) throw new Error('empty');
+  } catch {
+    return res.status(400).json({ error: 'image_base64 is not valid base64' });
+  }
+  try {
+    const record = mockupReferences.add({ category, name, buffer, mimeType });
+    log(`Admin added mockup reference "${record.name}" (${record.category})`);
+    res.json({ reference: { id: record.id, category: record.category, name: record.name, logo_zone: record.logo_zone, created_at: record.created_at } });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+/** PATCH /admin/mockup-references/:id — rename or set the logo zone. */
+router.patch('/mockup-references/:id', (req, res) => {
+  const { name, logo_zone: logoZone } = req.body || {};
+  const updated = mockupReferences.update(req.params.id, { name, logo_zone: logoZone });
+  if (!updated) return res.status(404).json({ error: 'Reference not found' });
+  res.json({ reference: { id: updated.id, category: updated.category, name: updated.name, logo_zone: updated.logo_zone, created_at: updated.created_at } });
+});
+
+/** DELETE /admin/mockup-references/:id */
+router.delete('/mockup-references/:id', (req, res) => {
+  const ok = mockupReferences.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Reference not found' });
+  log(`Admin deleted mockup reference ${req.params.id}`);
+  res.json({ ok: true });
 });
 
 module.exports = router;

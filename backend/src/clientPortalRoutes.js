@@ -432,6 +432,7 @@ router.patch('/quotes/:id', async (req, res) => {
         return res.status(502).json({ error: message, quote: quoteManager.getQuoteById(quote.id) });
       }
       log(`Client portal: ${req.client.name} approved quote for ${quote.name}`);
+      flagDeferredMockupsForDesign(req.clientId, quote.customer_number);
 
     } else if (action === 'reject') {
       quoteActions.rejectQuote(quote);
@@ -742,6 +743,17 @@ router.put('/settings', (req, res) => {
 // Mockup requests
 // ------------------------------------------------------------------
 
+/**
+ * When a quote is approved for a customer who has a deferred (fabricated /
+ * manual) mockup, flag it so the owner is reminded to create the design.
+ */
+function flagDeferredMockupsForDesign(clientId, customerNumber) {
+  const norm = (n) => String(n || '').replace(/\D/g, '');
+  mockupManager.getMockupsForClient(clientId)
+    .filter((m) => m.deferred && !m.manual_design_needed && norm(m.customer_number) === norm(customerNumber))
+    .forEach((m) => mockupManager.setMockupFields(m.id, { manual_design_needed: true }));
+}
+
 /** GET /client/mockups/presets — return sign-type presets and context options. */
 router.get('/mockups/presets', (req, res) => {
   res.json({ presets: SIGN_PRESETS, contexts: SIGN_CONTEXTS });
@@ -834,110 +846,76 @@ router.patch('/mockups/:id', async (req, res) => {
 });
 
 /**
- * POST /client/mockups/:id/revise — request a revision.
- * Body: { instructions: string }
- * Generates a new image via Stability AI using the original description +
- * revision instructions, then archives the current version into history.
+ * POST /client/mockups/:id/revise — re-composite a flat-signage mockup with
+ * an adjusted logo position and/or size.
+ * Body: { offset_x, offset_y, scale }  (all optional)
+ *   offset_x / offset_y — fractional nudge, roughly -0.3..0.3
+ *   scale               — logo size multiplier, roughly 0.5..1.6
+ * The previous version is archived into history; the mockup returns to
+ * "awaiting review".
  */
 router.post('/mockups/:id/revise', async (req, res) => {
   const mockup = mockupManager.getMockupById(req.params.id);
   if (!mockup || mockup.client_id !== req.clientId) {
     return res.status(404).json({ error: 'Mockup not found' });
   }
-  const { instructions, preset: presetId, context: contextId } = req.body || {};
-
-  // Two modes: free-text revision OR preset+context restyle
-  let combinedPrompt;
-  let revisionLabel;
-
-  if (presetId || contextId) {
-    const { SIGN_PRESETS, SIGN_CONTEXTS } = require('./mockupPresets');
-    const presetObj = SIGN_PRESETS.find((p) => p.id === presetId);
-    const contextObj = SIGN_CONTEXTS.find((c) => c.id === contextId);
-    if (!presetObj && !contextObj) {
-      return res.status(400).json({ error: 'Unknown preset or context' });
-    }
-    const customerDesc = (mockup.description || '').replace(/\. Revision:.*$/s, '').replace(/\. Restyle:.*$/s, '').trim();
-    const parts = [
-      contextObj ? contextObj.prompt : '',
-      presetObj ? presetObj.prompt : '',
-      customerDesc,
-    ].filter(Boolean);
-    combinedPrompt = parts.join(' ');
-    revisionLabel = [presetObj && presetObj.label, contextObj && contextObj.label].filter(Boolean).join(' + ');
-    // Free-text instructions can accompany a preset restyle
-    if (instructions && String(instructions).trim()) {
-      const extra = String(instructions).trim();
-      combinedPrompt += `. ${extra}`;
-      revisionLabel += ` — ${extra}`;
-    }
-  } else {
-    if (!instructions || !String(instructions).trim()) {
-      return res.status(400).json({ error: 'instructions or preset/context are required' });
-    }
-    const trimmedInstructions = String(instructions).trim();
-    const baseDesc = (mockup.description || '').replace(/\. Revision:.*$/s, '').replace(/\. Restyle:.*$/s, '').trim();
-    combinedPrompt = `${baseDesc}. Revision: ${trimmedInstructions}`;
-    revisionLabel = trimmedInstructions;
+  if (mockup.deferred) {
+    return res.status(400).json({ error: 'This mockup is a manual design task and cannot be re-composited.' });
   }
 
-  // Generate new image via Stability AI, using the current mockup image as
-  // a reference so revisions build on the previous version instead of
-  // starting from scratch.
-  if (!process.env.STABILITY_API_KEY) {
-    return res.status(503).json({ error: 'Image generation not configured' });
+  const mockupReferences = require('./mockupReferences');
+  const compositor = require('./mockupCompositor');
+
+  const reference = mockup.reference_id ? mockupReferences.getById(mockup.reference_id) : null;
+  if (!reference || !fs.existsSync(reference.image_path)) {
+    return res.status(400).json({ error: 'The reference image for this mockup is no longer available.' });
   }
-  // Find the customer's own logo/artwork (most recent image they sent) so it
-  // can be carried into every redesign, whatever the new sign type is.
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(+v) ? +v : 0));
+  const offset = {
+    x: clamp(req.body?.offset_x, -0.4, 0.4),
+    y: clamp(req.body?.offset_y, -0.4, 0.4),
+  };
+  const scale = clamp(req.body?.scale ?? 1, 0.4, 2);
+
+  // Re-use the customer's logo if we have one; otherwise re-render sign text.
   const customerImages = mediaManager
     .getAttachmentsForCustomerInWindow(req.clientId, mockup.customer_number, new Date(0).toISOString(), new Date().toISOString())
     .filter((a) => a.mime_type && a.mime_type.startsWith('image/') && a.file_path && fs.existsSync(a.file_path));
   const logo = customerImages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-
-  let promptText = combinedPrompt;
-  let referenceImagePath = null;
-  let referenceMimeType = null;
-  let strength = 0.6;
-
-  if (logo) {
-    // Prefer the logo as the reference image so branding carries across; the
-    // sign type/changes come from the prompt (kept dominant via low strength).
-    promptText += " Incorporate the customer's provided logo and brand artwork into the sign.";
-    referenceImagePath = logo.file_path;
-    referenceMimeType = logo.mime_type;
-    strength = 0.35;
-  } else if (!presetId && mockup.image_path && fs.existsSync(mockup.image_path)) {
-    // No logo: for a free-text tweak, build on the previous mockup image.
-    referenceImagePath = mockup.image_path;
-    strength = 0.6;
-  }
+  const signText = (mockup.description || '').split(/[.\n]/)[0].slice(0, 40);
 
   let newImagePath = null;
   try {
-    const stability = require('./stabilityClient');
-    const stylePrompt = req.client.mockup_style_prompt || 'Isolated product shot of the sign only. Clean, plain light-grey or white background. No buildings, no street context, no people, no environment. The sign fills most of the frame. Photorealistic studio render.';
-    const buffer = await stability.generateSignImage({
-      prompt: `${stylePrompt} ${promptText}`,
-      referenceImagePath,
-      referenceMimeType,
-      strength,
+    const buffer = await compositor.composite({
+      referencePath: reference.image_path,
+      logoBuffer: logo ? fs.readFileSync(logo.file_path) : null,
+      text: logo ? '' : signText,
+      zone: reference.logo_zone,
+      offset,
+      scale,
     });
-    newImagePath = stability.saveMockupImage(req.clientId, buffer);
+    newImagePath = compositor.saveMockupImage(req.clientId, buffer);
   } catch (err) {
-    logError(`[portal] Mockup revision Stability AI failed:`, err.message);
-    return res.status(502).json({ error: 'Image generation failed — please try again' });
+    logError(`[portal] Mockup re-composite failed:`, err.message);
+    return res.status(502).json({ error: 'Could not regenerate the mockup — please try again.' });
   }
+
+  const parts = [];
+  if (offset.x || offset.y) parts.push('moved logo');
+  if (scale !== 1) parts.push(scale > 1 ? 'enlarged logo' : 'reduced logo');
+  const revisionLabel = parts.join(', ') || 'adjusted logo';
 
   mockupManager.applyRevision(mockup.id, {
     newImagePath,
-    newDescription: combinedPrompt,
+    newDescription: mockup.description,
     revisionInstructions: revisionLabel,
   });
-  // A redesign always returns the mockup to "awaiting review" so the owner can
-  // look at the new version and decide whether to send it.
+  // Persist the new offset/scale so the next revision starts from here.
+  mockupManager.setMockupFields(mockup.id, { logo_offset: offset, logo_scale: scale });
   const updated = mockupManager.setMockupStatus(mockup.id, 'pending');
 
-  log(`Client portal: ${req.client.name} requested revision #${updated.revision_count} for mockup ${mockup.id}`);
+  log(`Client portal: ${req.client.name} re-composited mockup ${mockup.id} (${revisionLabel})`);
   return res.json({ mockup: updated });
 });
 
@@ -979,7 +957,7 @@ router.post('/send-both', async (req, res) => {
   try {
     const buffer = fs.readFileSync(mockup.image_path);
     await sendWhatsAppImage(req.client, mockup.customer_number, buffer, 'mockup.png',
-      "Here's a visual concept of your sign \u{1F3A8}");
+      "Here's how your sign will look");
   } catch (err) {
     logError(`[${req.client.name}] send-both: failed to send mockup image:`, err.message);
     return res.status(502).json({ error: 'Failed to send the mockup image via WhatsApp' });
@@ -990,7 +968,7 @@ router.post('/send-both', async (req, res) => {
     client_name: req.client.name,
     customer_number: mockup.customer_number,
     customer_message: null,
-    bot_reply: "[Mockup image sent] Here's a visual concept of your sign",
+    bot_reply: "[Mockup image sent] Here's how your sign will look",
     response_time_ms: 0,
     status: 'success',
   });
