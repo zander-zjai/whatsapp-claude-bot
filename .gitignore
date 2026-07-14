@@ -11,6 +11,10 @@ logs.json
 settings.json
 conversations.json
 quotes.json
+mockups.json
+mockup_references.json
+mockups/
+references/
 quote-pdfs/
 error-logs/
 backups/
