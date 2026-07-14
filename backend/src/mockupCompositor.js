@@ -3,8 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp');
 const { dataPath } = require('./fileStore');
+
+// sharp is a native module; load it lazily so a load/binary problem can only
+// affect mockup compositing, never crash the whole server at boot.
+let _sharp = null;
+function sharp(...args) {
+  if (!_sharp) _sharp = require('sharp');
+  return _sharp(...args);
+}
 
 /**
  * Composites a customer's logo (or generated text) onto a reference signage

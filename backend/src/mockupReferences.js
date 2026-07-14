@@ -4,7 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { readJSON, writeJSON, dataPath } = require('./fileStore');
-const { DEFAULT_ZONE } = require('./mockupCompositor');
+
+// Kept in sync with mockupCompositor.DEFAULT_ZONE. Defined locally so loading
+// the reference library at boot never pulls in sharp (the compositor's native
+// dependency) — compositing loads lazily only when a mockup is generated.
+const DEFAULT_ZONE = { x: 0.25, y: 0.38, width: 0.5, height: 0.24 };
 
 /**
  * Admin-managed library of reference signage photos. Each reference belongs to
