@@ -11,36 +11,39 @@
  */
 
 // Checked in priority order — the first category whose keywords appear wins.
-// Fabricated is checked before flat_cut so "fabricated letters" doesn't get
-// mis-classified as flat letters.
+// Letter signage (fabricated OR flat cut) always defers to a manual design:
+// letters need real design work, not a logo dropped onto a photo.
 const CATEGORY_KEYWORDS = [
   ['fabricated_letters', [
     'fabricated', 'channel letter', '3d letter', 'three dimensional letter',
     'built-up', 'built up', 'box letter', 'metal letter', 'stainless letter',
     'chrome letter', 'illuminated letter', 'halo lit', 'halo-lit',
+    // Flat cut letters are handled the same way — deferred to manual design.
+    'flat cut', 'flat-cut', 'cut letter', 'flat letter', 'acrylic letter',
+    'perspex letter', 'laser cut letter',
+  ]],
+  ['vehicle_wrap', [
+    'vehicle wrap', 'car wrap', 'van wrap', 'bakkie wrap', 'truck wrap',
+    'vehicle branding', 'fleet branding', 'vehicle graphic', 'full wrap',
+    'vinyl wrap', 'wrap my', 'wrap the car', 'wrap the van',
   ]],
   ['window_vinyl', [
     'window vinyl', 'window graphic', 'window decal', 'window sticker',
     'frosted vinyl', 'frosted glass', 'window signage', 'cut vinyl on glass',
-  ]],
-  ['flat_cut_letters', [
-    'flat cut', 'flat-cut', 'cut letter', 'flat letter', 'acrylic letter',
-    'perspex letter', 'laser cut letter', 'flat cut letters',
+    'sandblast', 'shopfront vinyl',
   ]],
   ['lightbox', [
     'lightbox', 'light box', 'light-box', 'illuminated box', 'led box',
   ]],
-  ['pvc', [
-    'pvc', 'foamex', 'forex', 'foam board', 'rigid sign', 'flat panel sign',
-    'composite panel', 'chromadek', 'aluminium sign board',
-  ]],
-  ['banner', [
-    'banner', 'pull-up', 'pullup', 'pull up', 'roll-up', 'rollup',
-    'vinyl banner', 'pvc banner', 'mesh banner',
+  // PVC signs and banners are the same product family — one category.
+  ['pvc_banner', [
+    'pvc', 'banner', 'foamex', 'forex', 'foam board', 'rigid sign',
+    'flat panel sign', 'composite panel', 'chromadek', 'aluminium sign board',
+    'pull-up', 'pullup', 'pull up', 'roll-up', 'rollup', 'mesh banner',
   ]],
 ];
 
-const FLAT_CATEGORIES = ['lightbox', 'pvc', 'banner', 'window_vinyl', 'flat_cut_letters'];
+const FLAT_CATEGORIES = ['lightbox', 'pvc_banner', 'window_vinyl', 'vehicle_wrap'];
 
 /**
  * @returns {{ category: string|null, deferred: boolean, reason: string }}

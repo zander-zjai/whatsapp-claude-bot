@@ -77,6 +77,12 @@ function buildSystemPrompt(client, options = {}) {
     );
   }
 
+  if (options.imageFromEarlier) {
+    parts.push(
+      `The image attached to this message is the logo/artwork the customer already sent EARLIER in this conversation — they have not just re-sent it. You can see it, so never ask them to send their logo or artwork again, and don't thank them for sending it again. Refer to it naturally if it's relevant.`
+    );
+  }
+
   if (options.quoteStatusSummary) {
     parts.push(
       `QUOTE STATUS: ${options.quoteStatusSummary} If the customer asks about the status of their quote or order, answer directly using this information — you don't need to involve the owner.`

@@ -6,6 +6,42 @@ const { log } = require('./logger');
 
 const GRAPH_API_VERSION = 'v18.0';
 
+// Transient network faults that are worth retrying. A single ECONNRESET on
+// Meta's API used to silently drop a customer reply entirely.
+const RETRYABLE_CODES = new Set([
+  'ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'EAI_AGAIN', 'EPIPE', 'ENOTFOUND', 'ECONNREFUSED',
+]);
+
+function isRetryable(err) {
+  if (err.code && RETRYABLE_CODES.has(err.code)) return true;
+  if (err.message && /socket hang up|network error|timeout/i.test(err.message)) return true;
+  const status = err.response && err.response.status;
+  // 429/5xx are transient; 4xx (bad token, malformed number) never are —
+  // retrying those just delays the failure.
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+/**
+ * Run a Graph API call, retrying transient network/5xx failures with
+ * exponential backoff. Non-transient errors (4xx) throw immediately.
+ */
+async function withRetry(fn, label, attempts = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === attempts || !isRetryable(err)) throw err;
+      const delayMs = 600 * 2 ** (attempt - 1); // 600ms, 1.2s
+      const reason = err.code || (err.response && err.response.status) || err.message;
+      log(`[whatsapp] ${label} failed (${reason}) — retrying in ${delayMs}ms (attempt ${attempt + 1}/${attempts})`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Send a plain text WhatsApp message via the WhatsApp Business Cloud API.
  *
@@ -25,13 +61,16 @@ async function sendWhatsAppMessage(client, to, text) {
     text: { body: text },
   };
 
-  const response = await axios.post(url, payload, {
-    headers: {
-      Authorization: `Bearer ${client.whatsapp_token}`,
-      'Content-Type': 'application/json',
-    },
-    timeout: 15000,
-  });
+  const response = await withRetry(
+    () => axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${client.whatsapp_token}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }),
+    'send text reply'
+  );
 
   log(`[${client.name}] Outgoing reply -> ${to}: "${text}"`);
   return response.data;
@@ -52,15 +91,18 @@ async function uploadMedia(client, buffer, filename) {
   form.append('messaging_product', 'whatsapp');
   form.append('file', buffer, { filename, contentType: 'application/pdf' });
 
-  const response = await axios.post(url, form, {
-    headers: {
-      Authorization: `Bearer ${client.whatsapp_token}`,
-      ...form.getHeaders(),
-    },
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity,
-    timeout: 30000,
-  });
+  const response = await withRetry(
+    () => axios.post(url, form, {
+      headers: {
+        Authorization: `Bearer ${client.whatsapp_token}`,
+        ...form.getHeaders(),
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 30000,
+    }),
+    'upload document media'
+  );
 
   return response.data.id;
 }
@@ -87,13 +129,16 @@ async function sendWhatsAppDocument(client, to, buffer, filename, caption) {
     document: { id: mediaId, filename, caption },
   };
 
-  const response = await axios.post(url, payload, {
-    headers: {
-      Authorization: `Bearer ${client.whatsapp_token}`,
-      'Content-Type': 'application/json',
-    },
-    timeout: 30000,
-  });
+  const response = await withRetry(
+    () => axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${client.whatsapp_token}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    }),
+    'send document'
+  );
 
   log(`[${client.name}] Outgoing document -> ${to}: "${filename}"`);
   return response.data;
@@ -114,15 +159,18 @@ async function uploadImageMedia(client, buffer, filename) {
   form.append('messaging_product', 'whatsapp');
   form.append('file', buffer, { filename, contentType: 'image/png' });
 
-  const response = await axios.post(url, form, {
-    headers: {
-      Authorization: `Bearer ${client.whatsapp_token}`,
-      ...form.getHeaders(),
-    },
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity,
-    timeout: 30000,
-  });
+  const response = await withRetry(
+    () => axios.post(url, form, {
+      headers: {
+        Authorization: `Bearer ${client.whatsapp_token}`,
+        ...form.getHeaders(),
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 30000,
+    }),
+    'upload image media'
+  );
 
   return response.data.id;
 }
@@ -149,13 +197,16 @@ async function sendWhatsAppImage(client, to, buffer, filename, caption) {
     image: { id: mediaId, caption },
   };
 
-  const response = await axios.post(url, payload, {
-    headers: {
-      Authorization: `Bearer ${client.whatsapp_token}`,
-      'Content-Type': 'application/json',
-    },
-    timeout: 30000,
-  });
+  const response = await withRetry(
+    () => axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${client.whatsapp_token}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    }),
+    'send image'
+  );
 
   log(`[${client.name}] Outgoing image -> ${to}: "${filename}"`);
   return response.data;

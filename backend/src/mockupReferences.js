@@ -21,18 +21,38 @@ const REFERENCES_FILE = 'mockup_references.json';
 
 const CATEGORIES = [
   { id: 'lightbox', label: 'Lightbox' },
-  { id: 'pvc', label: 'PVC Sign' },
-  { id: 'banner', label: 'Banner' },
+  { id: 'pvc_banner', label: 'PVC Banner' },
   { id: 'window_vinyl', label: 'Window Vinyl' },
-  { id: 'flat_cut_letters', label: 'Flat Cut Letters' },
+  { id: 'vehicle_wrap', label: 'Vehicle Wrap' },
 ];
 const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
+
+// Old category ids -> current ones. "PVC Sign" and "Banner" were the same
+// product family and are now one category; letter signage is handled as a
+// manual design task instead of compositing.
+const LEGACY_CATEGORY_MAP = {
+  pvc: 'pvc_banner',
+  banner: 'pvc_banner',
+};
 
 let references = [];
 
 function load() {
   const parsed = readJSON(REFERENCES_FILE, { references: [] });
   references = Array.isArray(parsed.references) ? parsed.references : [];
+
+  // Migrate any references saved under a retired category id so they stay
+  // visible and usable after the category restructure.
+  let migrated = 0;
+  references.forEach((r) => {
+    const mapped = LEGACY_CATEGORY_MAP[r.category];
+    if (mapped) {
+      r.category = mapped;
+      migrated += 1;
+    }
+  });
+  if (migrated) persist();
+
   return references;
 }
 

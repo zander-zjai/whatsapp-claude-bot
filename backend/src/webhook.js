@@ -653,6 +653,44 @@ function isMockupRequest(text) {
   return MOCKUP_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+// How long an image the customer sent stays "visible" to Zara on follow-up
+// turns. Long enough to cover a day's conversation about the same job, short
+// enough that we aren't re-billing image tokens on every message forever.
+// After this, she simply asks for the artwork again.
+const IMAGE_CONTEXT_WINDOW_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+/**
+ * Re-attach the most recent image this customer sent within the context
+ * window, so Zara still "remembers" their logo on later turns instead of
+ * asking for artwork they already sent.
+ *
+ * Every turn this fires re-sends the image to Claude and re-bills image
+ * tokens, which is why it's time-boxed rather than kept for the whole history.
+ *
+ * @returns {{ imageBase64: string, imageMimeType: string }|null}
+ */
+function recallRecentImage(clientId, from) {
+  const since = new Date(Date.now() - IMAGE_CONTEXT_WINDOW_MS).toISOString();
+  const until = new Date().toISOString();
+  const recent = mediaManager
+    .getAttachmentsForCustomerInWindow(clientId, from, since, until)
+    .filter((a) => a.mime_type && VISION_MIME_TYPES.has(a.mime_type) && a.file_path && fs.existsSync(a.file_path))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const latest = recent[0];
+  if (!latest) return null;
+
+  try {
+    return {
+      imageBase64: fs.readFileSync(latest.file_path).toString('base64'),
+      imageMimeType: latest.mime_type,
+    };
+  } catch (err) {
+    logError(`Failed to re-read recent image for vision context:`, err.message);
+    return null;
+  }
+}
+
 /**
  * Find the most recent logo/artwork image the customer sent on WhatsApp.
  * Returns the attachment record (with file_path/mime_type) or null.
@@ -895,6 +933,19 @@ async function processMessage({
   memory.addMessage(client.id, from, 'user', text);
   const history = memory.getHistory(client.id, from);
 
+  // If this turn has no image of its own, re-attach one the customer sent
+  // recently (e.g. their logo) so Zara doesn't forget it the moment the
+  // conversation moves on. Images are never stored in history itself.
+  let visionImage = imageBase64 ? { imageBase64, imageMimeType } : null;
+  let imageFromEarlier = false;
+  if (!visionImage) {
+    const recalled = recallRecentImage(client.id, from);
+    if (recalled) {
+      visionImage = recalled;
+      imageFromEarlier = true;
+    }
+  }
+
   let reply;
   let status = 'success';
   let quote = null;
@@ -906,8 +957,9 @@ async function processMessage({
       quoteRequestsEnabled: !!client.quote_requests_enabled,
       quoteStatusSummary: quoteManager.describeQuoteForCustomer(client.id, from),
       hasAttachment,
-      imageBase64,
-      imageMimeType,
+      imageBase64: visionImage ? visionImage.imageBase64 : null,
+      imageMimeType: visionImage ? visionImage.imageMimeType : null,
+      imageFromEarlier,
     });
 
     const extracted = quoteManager.extractQuoteRequest(rawReply);
